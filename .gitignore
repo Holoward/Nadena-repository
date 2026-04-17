@@ -1,0 +1,17 @@
+.env
+*.db
+*.sqlite
+node_modules/
+WebApi/ClientApp/node_modules/
+WebApi/ClientApp/build/
+bin/
+obj/
+.vs/
+*.user
+pipeline/
+bronze/
+silver/
+gold/
+nadena_pipeline/
+WebApi/appsettings.json
+WebApi/appsettings.Development.json

@@ -1,0 +1,3 @@
+record_id,source,category,date_range_start,date_range_end,anonymized
+1,"YouTube|Spotify","General","2025-01-01","2025-12-31",true
+2,"YouTube|Spotify","General","2025-01-01","2025-12-31",true

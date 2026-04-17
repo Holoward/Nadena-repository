@@ -1,0 +1,57 @@
+2026-03-21 14:17:03.359 -05:00 [INF] Acquiring an exclusive lock for migration application. See https://aka.ms/efcore-docs-migrations-lock for more information if this takes too long.
+2026-03-21 14:17:03.489 -05:00 [INF] Executed DbCommand (23ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT COUNT(*) FROM "sqlite_master" WHERE "name" = '__EFMigrationsLock' AND "type" = 'table';
+2026-03-21 14:17:03.504 -05:00 [INF] Executed DbCommand (5ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+INSERT OR IGNORE INTO "__EFMigrationsLock"("Id", "Timestamp") VALUES(1, '2026-03-21 19:17:03.4991816+00:00');
+SELECT changes();
+2026-03-21 14:17:03.614 -05:00 [INF] Executed DbCommand (1ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+CREATE TABLE IF NOT EXISTS "__EFMigrationsHistory" (
+    "MigrationId" TEXT NOT NULL CONSTRAINT "PK___EFMigrationsHistory" PRIMARY KEY,
+    "ProductVersion" TEXT NOT NULL
+);
+2026-03-21 14:17:03.630 -05:00 [INF] Executed DbCommand (0ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT COUNT(*) FROM "sqlite_master" WHERE "name" = '__EFMigrationsHistory' AND "type" = 'table';
+2026-03-21 14:17:03.634 -05:00 [INF] Executed DbCommand (1ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT "MigrationId", "ProductVersion"
+FROM "__EFMigrationsHistory"
+ORDER BY "MigrationId";
+2026-03-21 14:17:03.661 -05:00 [INF] Applying migration '20260321175231_AddAuditLogsTable'.
+2026-03-21 14:17:03.704 -05:00 [INF] Executed DbCommand (0ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+CREATE TABLE "AuditLogs" (
+    "Id" TEXT NOT NULL CONSTRAINT "PK_AuditLogs" PRIMARY KEY,
+    "UserId" TEXT NULL,
+    "Action" TEXT NOT NULL,
+    "EntityType" TEXT NOT NULL,
+    "EntityId" TEXT NULL,
+    "OldValues" TEXT NULL,
+    "NewValues" TEXT NULL,
+    "IpAddress" TEXT NULL,
+    "UserAgent" TEXT NULL,
+    "Timestamp" TEXT NOT NULL,
+    "Success" INTEGER NOT NULL,
+    "ErrorMessage" TEXT NULL
+);
+2026-03-21 14:17:03.705 -05:00 [INF] Executed DbCommand (0ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20260321175231_AddAuditLogsTable', '9.0.0');
+2026-03-21 14:17:03.705 -05:00 [INF] Applying migration '20260321191615_AddProductionQualityFeatures'.
+2026-03-21 14:17:03.732 -05:00 [INF] Executed DbCommand (0ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20260321191615_AddProductionQualityFeatures', '9.0.0');
+2026-03-21 14:17:03.740 -05:00 [INF] Executed DbCommand (1ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+DELETE FROM "__EFMigrationsLock";
+2026-03-21 14:18:11.136 -05:00 [INF] Executed DbCommand (18ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT EXISTS (
+    SELECT 1
+    FROM "DataPools" AS "d")
+2026-03-21 14:18:11.465 -05:00 [INF] User profile is available. Using '/home/JDVD/.aspnet/DataProtection-Keys' as key repository; keys will not be encrypted at rest.
+2026-03-21 14:18:11.640 -05:00 [INF] Now listening on: http://localhost:5034
+2026-03-21 14:18:11.643 -05:00 [INF] Application started. Press Ctrl+C to shut down.
+2026-03-21 14:18:11.644 -05:00 [INF] Hosting environment: Development
+2026-03-21 14:18:11.644 -05:00 [INF] Content root path: /home/JDVD/Escritorio/Onion_arquitecture/WebApi
+2026-03-21 14:18:11.645 -05:00 [INF] No SPA development server running at http://localhost:3000 found.
+2026-03-21 14:18:12.550 -05:00 [ERR] There was an error trying to launch the SPA proxy.
+System.Threading.Tasks.TaskCanceledException: A task was canceled.
+   at Microsoft.AspNetCore.SpaProxy.SpaProxyLaunchManager.StartSpaProcessAndProbeForLiveness(CancellationToken cancellationToken)
+   at Microsoft.AspNetCore.SpaProxy.SpaProxyLaunchManager.<StartInBackground>g__UpdateStatus|7_0(Task launchTask)
+2026-03-21 14:18:12.649 -05:00 [INF] Application is shutting down...

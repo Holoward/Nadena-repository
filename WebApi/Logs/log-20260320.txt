@@ -1,0 +1,529 @@
+2026-03-20 17:38:23.674 -05:00 [INF] Executed DbCommand (36ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT COUNT(*) FROM "sqlite_master" WHERE "name" = '__EFMigrationsHistory' AND "type" = 'table';
+2026-03-20 17:38:23.808 -05:00 [INF] Executed DbCommand (1ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT COUNT(*) FROM "sqlite_master" WHERE "name" = '__EFMigrationsHistory' AND "type" = 'table';
+2026-03-20 17:38:23.831 -05:00 [INF] Executed DbCommand (1ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT "MigrationId", "ProductVersion"
+FROM "__EFMigrationsHistory"
+ORDER BY "MigrationId";
+2026-03-20 17:38:23.866 -05:00 [INF] Applying migration '20260320190000_AddB2BLicensingTables'.
+2026-03-20 17:38:24.027 -05:00 [INF] Executed DbCommand (2ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+CREATE TABLE "DataPools" (
+    "Id" INTEGER NOT NULL CONSTRAINT "PK_DataPools" PRIMARY KEY AUTOINCREMENT,
+    "Name" TEXT NOT NULL,
+    "Description" TEXT NOT NULL,
+    "Category" TEXT NOT NULL,
+    "PricePerMonth" TEXT NOT NULL,
+    "RevenueSharePercent" TEXT NOT NULL,
+    "IsActive" INTEGER NOT NULL,
+    "Created" TEXT NOT NULL,
+    "CreatedBy" TEXT NOT NULL,
+    "LastModified" TEXT NOT NULL,
+    "LastModifiedBY" TEXT NOT NULL
+);
+2026-03-20 17:38:24.027 -05:00 [INF] Executed DbCommand (0ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+CREATE TABLE "ApiKeys" (
+    "Id" TEXT NOT NULL CONSTRAINT "PK_ApiKeys" PRIMARY KEY,
+    "BuyerId" TEXT NOT NULL,
+    "KeyPrefix" TEXT NOT NULL,
+    "KeyHash" TEXT NOT NULL,
+    "ExpiresAt" TEXT NOT NULL,
+    "IsRevoked" INTEGER NOT NULL,
+    "LastUsedAt" TEXT NULL,
+    "Created" TEXT NOT NULL,
+    "CreatedBy" TEXT NOT NULL,
+    "LastModified" TEXT NOT NULL,
+    "LastModifiedBY" TEXT NOT NULL
+);
+2026-03-20 17:38:24.028 -05:00 [INF] Executed DbCommand (0ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+CREATE TABLE "DataLicenses" (
+    "Id" TEXT NOT NULL CONSTRAINT "PK_DataLicenses" PRIMARY KEY,
+    "BuyerId" TEXT NOT NULL,
+    "DataPoolId" INTEGER NOT NULL,
+    "ApiKeyId" TEXT NOT NULL,
+    "LicensedFrom" TEXT NOT NULL,
+    "LicensedUntil" TEXT NOT NULL,
+    "AmountPaid" TEXT NOT NULL,
+    "PlatformFee" TEXT NOT NULL,
+    "VolunteerShare" TEXT NOT NULL,
+    "MonthsLicensed" INTEGER NOT NULL,
+    "Status" INTEGER NOT NULL,
+    "DistributionTxRef" TEXT NULL,
+    "Created" TEXT NOT NULL,
+    "CreatedBy" TEXT NOT NULL,
+    "LastModified" TEXT NOT NULL,
+    "LastModifiedBY" TEXT NOT NULL,
+    CONSTRAINT "FK_DataLicenses_ApiKeys_ApiKeyId" FOREIGN KEY ("ApiKeyId") REFERENCES "ApiKeys" ("Id") ON DELETE CASCADE,
+    CONSTRAINT "FK_DataLicenses_DataPools_DataPoolId" FOREIGN KEY ("DataPoolId") REFERENCES "DataPools" ("Id") ON DELETE CASCADE
+);
+2026-03-20 17:38:24.029 -05:00 [INF] Executed DbCommand (1ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+ALTER TABLE "Datasets" ADD "DataPoolId" INTEGER NULL;
+2026-03-20 17:38:24.029 -05:00 [INF] Executed DbCommand (0ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+CREATE INDEX "IX_DataLicenses_ApiKeyId" ON "DataLicenses" ("ApiKeyId");
+2026-03-20 17:38:24.029 -05:00 [INF] Executed DbCommand (0ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+CREATE INDEX "IX_DataLicenses_DataPoolId" ON "DataLicenses" ("DataPoolId");
+2026-03-20 17:38:24.030 -05:00 [INF] Executed DbCommand (0ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+CREATE INDEX "IX_ApiKeys_BuyerId" ON "ApiKeys" ("BuyerId");
+2026-03-20 17:38:24.030 -05:00 [INF] Executed DbCommand (0ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+CREATE INDEX "IX_DataPools_Name" ON "DataPools" ("Name");
+2026-03-20 17:38:24.030 -05:00 [INF] Executed DbCommand (0ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20260320190000_AddB2BLicensingTables', '8.0.11');
+2026-03-20 19:21:54.245 -05:00 [INF] Executed DbCommand (21ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT EXISTS (
+    SELECT 1
+    FROM "DataPools" AS "d")
+2026-03-20 19:21:54.582 -05:00 [INF] User profile is available. Using '/home/JDVD/.aspnet/DataProtection-Keys' as key repository; keys will not be encrypted at rest.
+2026-03-20 19:21:54.740 -05:00 [INF] Now listening on: http://localhost:5034
+2026-03-20 19:21:54.745 -05:00 [INF] Application started. Press Ctrl+C to shut down.
+2026-03-20 19:21:54.746 -05:00 [INF] Hosting environment: Development
+2026-03-20 19:21:54.746 -05:00 [INF] Content root path: /home/JDVD/Escritorio/Onion_arquitecture/WebApi
+2026-03-20 19:21:54.768 -05:00 [INF] No SPA development server running at http://localhost:3000 found.
+2026-03-20 19:21:59.803 -05:00 [ERR] Couldn't start the SPA development server with command 'npm start'.
+2026-03-20 19:22:06.434 -05:00 [INF] Request starting HTTP/1.1 POST http://localhost:5034/api/v1/Auth/register - application/json 213
+2026-03-20 19:22:06.447 -05:00 [WRN] Failed to determine the https port for redirect.
+2026-03-20 19:22:06.652 -05:00 [INF] Executing endpoint 'WebApi.Controllers.v1.AuthController.Register (WebApi)'
+2026-03-20 19:22:06.693 -05:00 [INF] Route matched with {action = "Register", controller = "Auth"}. Executing controller action with signature System.Threading.Tasks.Task`1[Microsoft.AspNetCore.Mvc.IActionResult] Register(WebApi.Models.RegisterRequest) on controller WebApi.Controllers.v1.AuthController (WebApi).
+2026-03-20 19:22:07.010 -05:00 [INF] Executed DbCommand (8ms) [Parameters=[@__normalizedEmail_0='?' (Size = 21)], CommandType='"Text"', CommandTimeout='30']
+SELECT "a"."Id", "a"."AccessFailedCount", "a"."BuyerId", "a"."ConcurrencyStamp", "a"."Email", "a"."EmailConfirmed", "a"."FullName", "a"."LockoutEnabled", "a"."LockoutEnd", "a"."NormalizedEmail", "a"."NormalizedUserName", "a"."PasswordHash", "a"."PayPalEmail", "a"."PhoneNumber", "a"."PhoneNumberConfirmed", "a"."Role", "a"."SecurityStamp", "a"."TwoFactorEnabled", "a"."UserName", "a"."VolunteerId"
+FROM "AspNetUsers" AS "a"
+WHERE "a"."NormalizedEmail" = @__normalizedEmail_0
+LIMIT 2
+2026-03-20 19:22:07.198 -05:00 [INF] Executed DbCommand (1ms) [Parameters=[@__normalizedUserName_0='?' (Size = 21)], CommandType='"Text"', CommandTimeout='30']
+SELECT "a"."Id", "a"."AccessFailedCount", "a"."BuyerId", "a"."ConcurrencyStamp", "a"."Email", "a"."EmailConfirmed", "a"."FullName", "a"."LockoutEnabled", "a"."LockoutEnd", "a"."NormalizedEmail", "a"."NormalizedUserName", "a"."PasswordHash", "a"."PayPalEmail", "a"."PhoneNumber", "a"."PhoneNumberConfirmed", "a"."Role", "a"."SecurityStamp", "a"."TwoFactorEnabled", "a"."UserName", "a"."VolunteerId"
+FROM "AspNetUsers" AS "a"
+WHERE "a"."NormalizedUserName" = @__normalizedUserName_0
+LIMIT 1
+2026-03-20 19:22:07.565 -05:00 [INF] Executed DbCommand (2ms) [Parameters=[@p0='?' (Size = 36), @p1='?' (DbType = Int32), @p2='?' (DbType = Int32), @p3='?' (Size = 36), @p4='?' (Size = 21), @p5='?' (DbType = Boolean), @p6='?' (Size = 13), @p7='?' (DbType = Boolean), @p8='?' (DbType = DateTimeOffset), @p9='?' (Size = 21), @p10='?' (Size = 21), @p11='?' (Size = 84), @p12='?' (Size = 14), @p13='?', @p14='?' (DbType = Boolean), @p15='?' (Size = 9), @p16='?' (Size = 32), @p17='?' (DbType = Boolean), @p18='?' (Size = 21), @p19='?' (DbType = Int32)], CommandType='"Text"', CommandTimeout='30']
+INSERT INTO "AspNetUsers" ("Id", "AccessFailedCount", "BuyerId", "ConcurrencyStamp", "Email", "EmailConfirmed", "FullName", "LockoutEnabled", "LockoutEnd", "NormalizedEmail", "NormalizedUserName", "PasswordHash", "PayPalEmail", "PhoneNumber", "PhoneNumberConfirmed", "Role", "SecurityStamp", "TwoFactorEnabled", "UserName", "VolunteerId")
+VALUES (@p0, @p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9, @p10, @p11, @p12, @p13, @p14, @p15, @p16, @p17, @p18, @p19);
+2026-03-20 19:22:07.757 -05:00 [INF] Executed DbCommand (6ms) [Parameters=[@p0='?' (DbType = DateTime), @p1='?', @p2='?' (Size = 1), @p3='?' (Size = 3), @p4='?' (DbType = DateTime), @p5='?' (Size = 6), @p6='?', @p7='?' (DbType = DateTime), @p8='?' (Size = 6), @p9='?' (Size = 37), @p10='?', @p11='?' (DbType = Boolean), @p12='?', @p13='?' (DbType = Int32), @p14='?' (Size = 36), @p15='?' (Size = 3)], CommandType='"Text"', CommandTimeout='30']
+INSERT INTO "Volunteers" ("ActivatedDate", "BuyerReference", "CommentCountEstimate", "ContentTypes", "Created", "CreatedBy", "FileLink", "LastModified", "LastModifiedBY", "Notes", "PayPalEmail", "PaymentSent", "PushToken", "Status", "UserId", "YouTubeAccountAge")
+VALUES (@p0, @p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9, @p10, @p11, @p12, @p13, @p14, @p15)
+RETURNING "Id";
+2026-03-20 19:22:07.845 -05:00 [INF] Executing OkObjectResult, writing value of type 'Application.Wrappers.ServiceResponse`1[[System.String, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]'.
+2026-03-20 19:22:07.888 -05:00 [INF] Executed action WebApi.Controllers.v1.AuthController.Register (WebApi) in 1188.8519ms
+2026-03-20 19:22:07.888 -05:00 [INF] Executed endpoint 'WebApi.Controllers.v1.AuthController.Register (WebApi)'
+2026-03-20 19:22:07.891 -05:00 [INF] HTTP POST /api/v1/Auth/register responded 200 in 1438.9402 ms
+2026-03-20 19:22:07.906 -05:00 [INF] Request finished HTTP/1.1 POST http://localhost:5034/api/v1/Auth/register - 200 null application/json; charset=utf-8 1475.1539ms
+2026-03-20 19:22:25.468 -05:00 [INF] Request starting HTTP/1.1 POST http://localhost:5034/api/v1/Auth/login - application/json 56
+2026-03-20 19:22:25.477 -05:00 [INF] Executing endpoint 'WebApi.Controllers.v1.AuthController.Login (WebApi)'
+2026-03-20 19:22:25.495 -05:00 [INF] Route matched with {action = "Login", controller = "Auth"}. Executing controller action with signature System.Threading.Tasks.Task`1[Microsoft.AspNetCore.Mvc.IActionResult] Login(WebApi.Models.LoginRequest) on controller WebApi.Controllers.v1.AuthController (WebApi).
+2026-03-20 19:22:25.793 -05:00 [INF] Executed DbCommand (0ms) [Parameters=[@__normalizedEmail_0='?' (Size = 21)], CommandType='"Text"', CommandTimeout='30']
+SELECT "a"."Id", "a"."AccessFailedCount", "a"."BuyerId", "a"."ConcurrencyStamp", "a"."Email", "a"."EmailConfirmed", "a"."FullName", "a"."LockoutEnabled", "a"."LockoutEnd", "a"."NormalizedEmail", "a"."NormalizedUserName", "a"."PasswordHash", "a"."PayPalEmail", "a"."PhoneNumber", "a"."PhoneNumberConfirmed", "a"."Role", "a"."SecurityStamp", "a"."TwoFactorEnabled", "a"."UserName", "a"."VolunteerId"
+FROM "AspNetUsers" AS "a"
+WHERE "a"."NormalizedEmail" = @__normalizedEmail_0
+LIMIT 2
+2026-03-20 19:22:25.977 -05:00 [INF] Executing OkObjectResult, writing value of type 'Application.Wrappers.ServiceResponse`1[[System.String, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]'.
+2026-03-20 19:22:25.978 -05:00 [INF] Executed action WebApi.Controllers.v1.AuthController.Login (WebApi) in 482.7675ms
+2026-03-20 19:22:25.979 -05:00 [INF] Executed endpoint 'WebApi.Controllers.v1.AuthController.Login (WebApi)'
+2026-03-20 19:22:25.979 -05:00 [INF] HTTP POST /api/v1/Auth/login responded 200 in 509.6437 ms
+2026-03-20 19:22:25.979 -05:00 [INF] Request finished HTTP/1.1 POST http://localhost:5034/api/v1/Auth/login - 200 null application/json; charset=utf-8 511.1735ms
+2026-03-20 19:23:05.857 -05:00 [INF] Request starting HTTP/1.1 GET http://localhost:5034/api/v1/Volunteer/user/d53419e7-5e3f-45c2-8a32-5e51855f1ca4 - null null
+2026-03-20 19:23:05.969 -05:00 [INF] Executing endpoint 'WebApi.Controllers.v1.VolunteerController.GetByUserId (WebApi)'
+2026-03-20 19:23:05.984 -05:00 [INF] Route matched with {action = "GetByUserId", controller = "Volunteer"}. Executing controller action with signature System.Threading.Tasks.Task`1[Microsoft.AspNetCore.Mvc.IActionResult] GetByUserId(System.String) on controller WebApi.Controllers.v1.VolunteerController (WebApi).
+2026-03-20 19:23:06.043 -05:00 [INF] Executed DbCommand (0ms) [Parameters=[@__userId_0='?' (Size = 36)], CommandType='"Text"', CommandTimeout='30']
+SELECT "v"."Id", "v"."ActivatedDate", "v"."BuyerReference", "v"."CommentCountEstimate", "v"."ContentTypes", "v"."Created", "v"."CreatedBy", "v"."FileLink", "v"."LastModified", "v"."LastModifiedBY", "v"."Notes", "v"."PayPalEmail", "v"."PaymentSent", "v"."PushToken", "v"."Status", "v"."UserId", "v"."YouTubeAccountAge"
+FROM "Volunteers" AS "v"
+WHERE "v"."UserId" = @__userId_0
+LIMIT 1
+2026-03-20 19:23:06.056 -05:00 [INF] Executing OkObjectResult, writing value of type 'Application.Wrappers.ServiceResponse`1[[Application.DTOs.VolunteerDto, Application, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]'.
+2026-03-20 19:23:06.083 -05:00 [INF] Executed action WebApi.Controllers.v1.VolunteerController.GetByUserId (WebApi) in 98.8891ms
+2026-03-20 19:23:06.084 -05:00 [INF] Executed endpoint 'WebApi.Controllers.v1.VolunteerController.GetByUserId (WebApi)'
+2026-03-20 19:23:06.084 -05:00 [INF] HTTP GET /api/v1/Volunteer/user/d53419e7-5e3f-45c2-8a32-5e51855f1ca4 responded 200 in 226.4113 ms
+2026-03-20 19:23:06.084 -05:00 [INF] Request finished HTTP/1.1 GET http://localhost:5034/api/v1/Volunteer/user/d53419e7-5e3f-45c2-8a32-5e51855f1ca4 - 200 null application/json; charset=utf-8 227.7288ms
+2026-03-20 19:23:22.138 -05:00 [INF] Request starting HTTP/1.1 POST http://localhost:5034/api/v1/Auth/register - application/json 144
+2026-03-20 19:23:22.139 -05:00 [INF] Executing endpoint 'WebApi.Controllers.v1.AuthController.Register (WebApi)'
+2026-03-20 19:23:22.140 -05:00 [INF] Route matched with {action = "Register", controller = "Auth"}. Executing controller action with signature System.Threading.Tasks.Task`1[Microsoft.AspNetCore.Mvc.IActionResult] Register(WebApi.Models.RegisterRequest) on controller WebApi.Controllers.v1.AuthController (WebApi).
+2026-03-20 19:23:22.181 -05:00 [INF] Executed DbCommand (0ms) [Parameters=[@__normalizedEmail_0='?' (Size = 17)], CommandType='"Text"', CommandTimeout='30']
+SELECT "a"."Id", "a"."AccessFailedCount", "a"."BuyerId", "a"."ConcurrencyStamp", "a"."Email", "a"."EmailConfirmed", "a"."FullName", "a"."LockoutEnabled", "a"."LockoutEnd", "a"."NormalizedEmail", "a"."NormalizedUserName", "a"."PasswordHash", "a"."PayPalEmail", "a"."PhoneNumber", "a"."PhoneNumberConfirmed", "a"."Role", "a"."SecurityStamp", "a"."TwoFactorEnabled", "a"."UserName", "a"."VolunteerId"
+FROM "AspNetUsers" AS "a"
+WHERE "a"."NormalizedEmail" = @__normalizedEmail_0
+LIMIT 2
+2026-03-20 19:23:22.343 -05:00 [INF] Executed DbCommand (0ms) [Parameters=[@__normalizedUserName_0='?' (Size = 17)], CommandType='"Text"', CommandTimeout='30']
+SELECT "a"."Id", "a"."AccessFailedCount", "a"."BuyerId", "a"."ConcurrencyStamp", "a"."Email", "a"."EmailConfirmed", "a"."FullName", "a"."LockoutEnabled", "a"."LockoutEnd", "a"."NormalizedEmail", "a"."NormalizedUserName", "a"."PasswordHash", "a"."PayPalEmail", "a"."PhoneNumber", "a"."PhoneNumberConfirmed", "a"."Role", "a"."SecurityStamp", "a"."TwoFactorEnabled", "a"."UserName", "a"."VolunteerId"
+FROM "AspNetUsers" AS "a"
+WHERE "a"."NormalizedUserName" = @__normalizedUserName_0
+LIMIT 1
+2026-03-20 19:23:22.346 -05:00 [INF] Executed DbCommand (1ms) [Parameters=[@p0='?' (Size = 36), @p1='?' (DbType = Int32), @p2='?' (DbType = Int32), @p3='?' (Size = 36), @p4='?' (Size = 17), @p5='?' (DbType = Boolean), @p6='?' (Size = 9), @p7='?' (DbType = Boolean), @p8='?' (DbType = DateTimeOffset), @p9='?' (Size = 17), @p10='?' (Size = 17), @p11='?' (Size = 84), @p12='?', @p13='?', @p14='?' (DbType = Boolean), @p15='?' (Size = 5), @p16='?' (Size = 32), @p17='?' (DbType = Boolean), @p18='?' (Size = 17), @p19='?' (DbType = Int32)], CommandType='"Text"', CommandTimeout='30']
+INSERT INTO "AspNetUsers" ("Id", "AccessFailedCount", "BuyerId", "ConcurrencyStamp", "Email", "EmailConfirmed", "FullName", "LockoutEnabled", "LockoutEnd", "NormalizedEmail", "NormalizedUserName", "PasswordHash", "PayPalEmail", "PhoneNumber", "PhoneNumberConfirmed", "Role", "SecurityStamp", "TwoFactorEnabled", "UserName", "VolunteerId")
+VALUES (@p0, @p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9, @p10, @p11, @p12, @p13, @p14, @p15, @p16, @p17, @p18, @p19);
+2026-03-20 19:23:22.427 -05:00 [INF] Executed DbCommand (6ms) [Parameters=[@p0='?' (Size = 9), @p1='?' (DbType = DateTime), @p2='?' (Size = 6), @p3='?' (DbType = DateTime), @p4='?' (Size = 6), @p5='?' (Size = 3), @p6='?' (Size = 36), @p7='?' (Size = 3)], CommandType='"Text"', CommandTimeout='30']
+INSERT INTO "Buyers" ("CompanyName", "Created", "CreatedBy", "LastModified", "LastModifiedBY", "UseCase", "UserId", "Website")
+VALUES (@p0, @p1, @p2, @p3, @p4, @p5, @p6, @p7)
+RETURNING "Id";
+2026-03-20 19:23:22.432 -05:00 [INF] Executing OkObjectResult, writing value of type 'Application.Wrappers.ServiceResponse`1[[System.String, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]'.
+2026-03-20 19:23:22.432 -05:00 [INF] Executed action WebApi.Controllers.v1.AuthController.Register (WebApi) in 292.3629ms
+2026-03-20 19:23:22.432 -05:00 [INF] Executed endpoint 'WebApi.Controllers.v1.AuthController.Register (WebApi)'
+2026-03-20 19:23:22.432 -05:00 [INF] HTTP POST /api/v1/Auth/register responded 200 in 293.5519 ms
+2026-03-20 19:23:22.433 -05:00 [INF] Request finished HTTP/1.1 POST http://localhost:5034/api/v1/Auth/register - 200 null application/json; charset=utf-8 294.4902ms
+2026-03-20 19:23:42.097 -05:00 [INF] Request starting HTTP/1.1 GET http://localhost:5034/api/v1/Dataset - null null
+2026-03-20 19:23:42.098 -05:00 [INF] Executing endpoint 'WebApi.Controllers.v1.DatasetController.Get (WebApi)'
+2026-03-20 19:23:42.116 -05:00 [INF] Route matched with {action = "Get", controller = "Dataset"}. Executing controller action with signature System.Threading.Tasks.Task`1[Microsoft.AspNetCore.Mvc.IActionResult] Get() on controller WebApi.Controllers.v1.DatasetController (WebApi).
+2026-03-20 19:23:42.146 -05:00 [INF] Executed DbCommand (5ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT "d"."Id", "d"."BuyerReference", "d"."CommentCount", "d"."Created", "d"."CreatedBy", "d"."DataPoolId", "d"."Description", "d"."LastModified", "d"."LastModifiedBY", "d"."Price", "d"."Status", "d"."Title", "d"."VolunteerCount"
+FROM "Datasets" AS "d"
+2026-03-20 19:23:42.148 -05:00 [INF] Executing OkObjectResult, writing value of type 'Application.Wrappers.ServiceResponse`1[[System.Collections.Generic.IEnumerable`1[[Application.DTOs.DatasetDto, Application, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]'.
+2026-03-20 19:23:42.162 -05:00 [INF] Executed action WebApi.Controllers.v1.DatasetController.Get (WebApi) in 46.2635ms
+2026-03-20 19:23:42.162 -05:00 [INF] Executed endpoint 'WebApi.Controllers.v1.DatasetController.Get (WebApi)'
+2026-03-20 19:23:42.162 -05:00 [INF] HTTP GET /api/v1/Dataset responded 200 in 65.1866 ms
+2026-03-20 19:23:42.163 -05:00 [INF] Request finished HTTP/1.1 GET http://localhost:5034/api/v1/Dataset - 200 null application/json; charset=utf-8 65.9623ms
+2026-03-20 19:24:04.063 -05:00 [INF] Request starting HTTP/1.1 POST http://localhost:5034/api/v1/Auth/register - application/json 90
+2026-03-20 19:24:04.064 -05:00 [INF] Executing endpoint 'WebApi.Controllers.v1.AuthController.Register (WebApi)'
+2026-03-20 19:24:04.064 -05:00 [INF] Route matched with {action = "Register", controller = "Auth"}. Executing controller action with signature System.Threading.Tasks.Task`1[Microsoft.AspNetCore.Mvc.IActionResult] Register(WebApi.Models.RegisterRequest) on controller WebApi.Controllers.v1.AuthController (WebApi).
+2026-03-20 19:24:04.069 -05:00 [INF] Executed DbCommand (0ms) [Parameters=[@__normalizedEmail_0='?' (Size = 17)], CommandType='"Text"', CommandTimeout='30']
+SELECT "a"."Id", "a"."AccessFailedCount", "a"."BuyerId", "a"."ConcurrencyStamp", "a"."Email", "a"."EmailConfirmed", "a"."FullName", "a"."LockoutEnabled", "a"."LockoutEnd", "a"."NormalizedEmail", "a"."NormalizedUserName", "a"."PasswordHash", "a"."PayPalEmail", "a"."PhoneNumber", "a"."PhoneNumberConfirmed", "a"."Role", "a"."SecurityStamp", "a"."TwoFactorEnabled", "a"."UserName", "a"."VolunteerId"
+FROM "AspNetUsers" AS "a"
+WHERE "a"."NormalizedEmail" = @__normalizedEmail_0
+LIMIT 2
+2026-03-20 19:24:04.476 -05:00 [INF] Executed DbCommand (0ms) [Parameters=[@__normalizedUserName_0='?' (Size = 17)], CommandType='"Text"', CommandTimeout='30']
+SELECT "a"."Id", "a"."AccessFailedCount", "a"."BuyerId", "a"."ConcurrencyStamp", "a"."Email", "a"."EmailConfirmed", "a"."FullName", "a"."LockoutEnabled", "a"."LockoutEnd", "a"."NormalizedEmail", "a"."NormalizedUserName", "a"."PasswordHash", "a"."PayPalEmail", "a"."PhoneNumber", "a"."PhoneNumberConfirmed", "a"."Role", "a"."SecurityStamp", "a"."TwoFactorEnabled", "a"."UserName", "a"."VolunteerId"
+FROM "AspNetUsers" AS "a"
+WHERE "a"."NormalizedUserName" = @__normalizedUserName_0
+LIMIT 1
+2026-03-20 19:24:04.484 -05:00 [INF] Executed DbCommand (5ms) [Parameters=[@p0='?' (Size = 36), @p1='?' (DbType = Int32), @p2='?' (DbType = Int32), @p3='?' (Size = 36), @p4='?' (Size = 17), @p5='?' (DbType = Boolean), @p6='?' (Size = 9), @p7='?' (DbType = Boolean), @p8='?' (DbType = DateTimeOffset), @p9='?' (Size = 17), @p10='?' (Size = 17), @p11='?' (Size = 84), @p12='?', @p13='?', @p14='?' (DbType = Boolean), @p15='?' (Size = 5), @p16='?' (Size = 32), @p17='?' (DbType = Boolean), @p18='?' (Size = 17), @p19='?' (DbType = Int32)], CommandType='"Text"', CommandTimeout='30']
+INSERT INTO "AspNetUsers" ("Id", "AccessFailedCount", "BuyerId", "ConcurrencyStamp", "Email", "EmailConfirmed", "FullName", "LockoutEnabled", "LockoutEnd", "NormalizedEmail", "NormalizedUserName", "PasswordHash", "PayPalEmail", "PhoneNumber", "PhoneNumberConfirmed", "Role", "SecurityStamp", "TwoFactorEnabled", "UserName", "VolunteerId")
+VALUES (@p0, @p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9, @p10, @p11, @p12, @p13, @p14, @p15, @p16, @p17, @p18, @p19);
+2026-03-20 19:24:04.486 -05:00 [INF] Executing OkObjectResult, writing value of type 'Application.Wrappers.ServiceResponse`1[[System.String, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]'.
+2026-03-20 19:24:04.487 -05:00 [INF] Executed action WebApi.Controllers.v1.AuthController.Register (WebApi) in 422.0598ms
+2026-03-20 19:24:04.487 -05:00 [INF] Executed endpoint 'WebApi.Controllers.v1.AuthController.Register (WebApi)'
+2026-03-20 19:24:04.487 -05:00 [INF] HTTP POST /api/v1/Auth/register responded 200 in 423.3741 ms
+2026-03-20 19:24:04.487 -05:00 [INF] Request finished HTTP/1.1 POST http://localhost:5034/api/v1/Auth/register - 200 null application/json; charset=utf-8 424.0915ms
+2026-03-20 19:24:32.631 -05:00 [INF] Request starting HTTP/1.1 GET http://localhost:5034/api/v1/Volunteer - null null
+2026-03-20 19:24:32.636 -05:00 [INF] Executing endpoint 'WebApi.Controllers.v1.VolunteerController.Get (WebApi)'
+2026-03-20 19:24:32.650 -05:00 [INF] Route matched with {action = "Get", controller = "Volunteer"}. Executing controller action with signature System.Threading.Tasks.Task`1[Microsoft.AspNetCore.Mvc.IActionResult] Get() on controller WebApi.Controllers.v1.VolunteerController (WebApi).
+2026-03-20 19:24:32.672 -05:00 [INF] Executed DbCommand (0ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT "v"."Id", "v"."ActivatedDate", "v"."BuyerReference", "v"."CommentCountEstimate", "v"."ContentTypes", "v"."Created", "v"."CreatedBy", "v"."FileLink", "v"."LastModified", "v"."LastModifiedBY", "v"."Notes", "v"."PayPalEmail", "v"."PaymentSent", "v"."PushToken", "v"."Status", "v"."UserId", "v"."YouTubeAccountAge"
+FROM "Volunteers" AS "v"
+2026-03-20 19:24:32.675 -05:00 [INF] Executing OkObjectResult, writing value of type 'Application.Wrappers.ServiceResponse`1[[System.Collections.Generic.IEnumerable`1[[Application.DTOs.VolunteerDto, Application, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]'.
+2026-03-20 19:24:32.685 -05:00 [INF] Executed action WebApi.Controllers.v1.VolunteerController.Get (WebApi) in 34.6843ms
+2026-03-20 19:24:32.685 -05:00 [INF] Executed endpoint 'WebApi.Controllers.v1.VolunteerController.Get (WebApi)'
+2026-03-20 19:24:32.685 -05:00 [INF] HTTP GET /api/v1/Volunteer responded 200 in 53.8246 ms
+2026-03-20 19:24:32.686 -05:00 [INF] Request finished HTTP/1.1 GET http://localhost:5034/api/v1/Volunteer - 200 null application/json; charset=utf-8 54.6057ms
+2026-03-20 19:24:55.431 -05:00 [INF] Request starting HTTP/1.1 PUT http://localhost:5034/api/v1/Volunteer/15/status - application/json 119
+2026-03-20 19:24:55.446 -05:00 [INF] Executing endpoint 'WebApi.Controllers.v1.VolunteerController.UpdateStatus (WebApi)'
+2026-03-20 19:24:55.466 -05:00 [INF] Route matched with {action = "UpdateStatus", controller = "Volunteer"}. Executing controller action with signature System.Threading.Tasks.Task`1[Microsoft.AspNetCore.Mvc.IActionResult] UpdateStatus(Int32, Application.Features.Volunteers.Commands.UpdateVolunteerStatus.UpdateVolunteerStatusCommand) on controller WebApi.Controllers.v1.VolunteerController (WebApi).
+2026-03-20 19:24:55.481 -05:00 [INF] Executing BadRequestObjectResult, writing value of type 'Microsoft.AspNetCore.Mvc.ValidationProblemDetails'.
+2026-03-20 19:24:55.525 -05:00 [INF] Executed action WebApi.Controllers.v1.VolunteerController.UpdateStatus (WebApi) in 58.7104ms
+2026-03-20 19:24:55.526 -05:00 [INF] Executed endpoint 'WebApi.Controllers.v1.VolunteerController.UpdateStatus (WebApi)'
+2026-03-20 19:24:55.526 -05:00 [INF] HTTP PUT /api/v1/Volunteer/15/status responded 400 in 94.3480 ms
+2026-03-20 19:24:55.526 -05:00 [INF] Request finished HTTP/1.1 PUT http://localhost:5034/api/v1/Volunteer/15/status - 400 null application/problem+json; charset=utf-8 94.8357ms
+2026-03-20 19:26:42.753 -05:00 [INF] Application is shutting down...
+2026-03-20 19:27:05.932 -05:00 [INF] Executed DbCommand (27ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT EXISTS (
+    SELECT 1
+    FROM "DataPools" AS "d")
+2026-03-20 19:27:06.300 -05:00 [INF] User profile is available. Using '/home/JDVD/.aspnet/DataProtection-Keys' as key repository; keys will not be encrypted at rest.
+2026-03-20 19:27:06.483 -05:00 [INF] Now listening on: http://localhost:5034
+2026-03-20 19:27:06.488 -05:00 [INF] Application started. Press Ctrl+C to shut down.
+2026-03-20 19:27:06.489 -05:00 [INF] Hosting environment: Development
+2026-03-20 19:27:06.489 -05:00 [INF] Content root path: /home/JDVD/Escritorio/Onion_arquitecture/WebApi
+2026-03-20 19:27:06.507 -05:00 [INF] No SPA development server running at http://localhost:3000 found.
+2026-03-20 19:27:11.546 -05:00 [ERR] Couldn't start the SPA development server with command 'npm start'.
+2026-03-20 19:27:58.812 -05:00 [INF] Request starting HTTP/1.1 GET http://localhost:5034/api/v1/Dataset - null null
+2026-03-20 19:27:58.833 -05:00 [WRN] Failed to determine the https port for redirect.
+2026-03-20 19:27:59.040 -05:00 [INF] Executing endpoint 'WebApi.Controllers.v1.DatasetController.Get (WebApi)'
+2026-03-20 19:27:59.076 -05:00 [INF] Route matched with {action = "Get", controller = "Dataset"}. Executing controller action with signature System.Threading.Tasks.Task`1[Microsoft.AspNetCore.Mvc.IActionResult] Get() on controller WebApi.Controllers.v1.DatasetController (WebApi).
+2026-03-20 19:27:59.280 -05:00 [INF] Executed DbCommand (6ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT "d"."Id", "d"."BuyerReference", "d"."CommentCount", "d"."Created", "d"."CreatedBy", "d"."DataPoolId", "d"."Description", "d"."LastModified", "d"."LastModifiedBY", "d"."Price", "d"."Status", "d"."Title", "d"."VolunteerCount"
+FROM "Datasets" AS "d"
+2026-03-20 19:27:59.294 -05:00 [INF] Executing OkObjectResult, writing value of type 'Application.Wrappers.ServiceResponse`1[[System.Collections.Generic.IEnumerable`1[[Application.DTOs.DatasetDto, Application, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]'.
+2026-03-20 19:27:59.430 -05:00 [INF] Executed action WebApi.Controllers.v1.DatasetController.Get (WebApi) in 342.721ms
+2026-03-20 19:27:59.432 -05:00 [INF] Executed endpoint 'WebApi.Controllers.v1.DatasetController.Get (WebApi)'
+2026-03-20 19:27:59.438 -05:00 [INF] HTTP GET /api/v1/Dataset responded 200 in 597.5959 ms
+2026-03-20 19:27:59.473 -05:00 [INF] Request finished HTTP/1.1 GET http://localhost:5034/api/v1/Dataset - 200 null application/json; charset=utf-8 666.1853ms
+2026-03-20 19:28:25.125 -05:00 [INF] Request starting HTTP/1.1 PUT http://localhost:5034/api/v1/Volunteer/15/status - application/json 119
+2026-03-20 19:28:25.266 -05:00 [INF] Executing endpoint 'WebApi.Controllers.v1.VolunteerController.UpdateStatus (WebApi)'
+2026-03-20 19:28:25.295 -05:00 [INF] Route matched with {action = "UpdateStatus", controller = "Volunteer"}. Executing controller action with signature System.Threading.Tasks.Task`1[Microsoft.AspNetCore.Mvc.IActionResult] UpdateStatus(Int32, Application.Features.Volunteers.Commands.UpdateVolunteerStatus.UpdateVolunteerStatusCommand) on controller WebApi.Controllers.v1.VolunteerController (WebApi).
+2026-03-20 19:28:25.359 -05:00 [INF] Executing ObjectResult, writing value of type 'Microsoft.AspNetCore.Mvc.ProblemDetails'.
+2026-03-20 19:28:25.398 -05:00 [INF] Executed action WebApi.Controllers.v1.VolunteerController.UpdateStatus (WebApi) in 102.8101ms
+2026-03-20 19:28:25.399 -05:00 [INF] Executed endpoint 'WebApi.Controllers.v1.VolunteerController.UpdateStatus (WebApi)'
+2026-03-20 19:28:25.399 -05:00 [INF] HTTP PUT /api/v1/Volunteer/15/status responded 400 in 272.2169 ms
+2026-03-20 19:28:25.399 -05:00 [INF] Request finished HTTP/1.1 PUT http://localhost:5034/api/v1/Volunteer/15/status - 400 null application/problem+json; charset=utf-8 274.0781ms
+2026-03-20 19:29:07.165 -05:00 [INF] Executed DbCommand (24ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT EXISTS (
+    SELECT 1
+    FROM "DataPools" AS "d")
+2026-03-20 19:29:07.499 -05:00 [INF] User profile is available. Using '/home/JDVD/.aspnet/DataProtection-Keys' as key repository; keys will not be encrypted at rest.
+2026-03-20 19:29:07.672 -05:00 [INF] No SPA development server running at http://localhost:3000 found.
+2026-03-20 19:29:07.670 -05:00 [ERR] Hosting failed to start
+System.IO.IOException: Failed to bind to address http://127.0.0.1:5034: address already in use.
+ ---> Microsoft.AspNetCore.Connections.AddressInUseException: Address already in use
+ ---> System.Net.Sockets.SocketException (98): Address already in use
+   at System.Net.Sockets.Socket.UpdateStatusAfterSocketErrorAndThrowException(SocketError error, Boolean disconnectOnFailure, String callerName)
+   at System.Net.Sockets.Socket.DoBind(EndPoint endPointSnapshot, SocketAddress socketAddress)
+   at System.Net.Sockets.Socket.Bind(EndPoint localEP)
+   at Microsoft.AspNetCore.Server.Kestrel.Transport.Sockets.SocketTransportOptions.CreateDefaultBoundListenSocket(EndPoint endpoint)
+   at Microsoft.AspNetCore.Server.Kestrel.Transport.Sockets.SocketConnectionListener.Bind()
+   --- End of inner exception stack trace ---
+   at Microsoft.AspNetCore.Server.Kestrel.Transport.Sockets.SocketConnectionListener.Bind()
+   at Microsoft.AspNetCore.Server.Kestrel.Transport.Sockets.SocketTransportFactory.BindAsync(EndPoint endpoint, CancellationToken cancellationToken)
+   at Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Infrastructure.TransportManager.BindAsync(EndPoint endPoint, ConnectionDelegate connectionDelegate, EndpointConfig endpointConfig, CancellationToken cancellationToken)
+   at Microsoft.AspNetCore.Server.Kestrel.Core.KestrelServerImpl.<>c__DisplayClass28_0`1.<<StartAsync>g__OnBind|0>d.MoveNext()
+--- End of stack trace from previous location ---
+   at Microsoft.AspNetCore.Server.Kestrel.Core.Internal.AddressBinder.BindEndpointAsync(ListenOptions endpoint, AddressBindContext context, CancellationToken cancellationToken)
+   --- End of inner exception stack trace ---
+   at Microsoft.AspNetCore.Server.Kestrel.Core.Internal.AddressBinder.BindEndpointAsync(ListenOptions endpoint, AddressBindContext context, CancellationToken cancellationToken)
+   at Microsoft.AspNetCore.Server.Kestrel.Core.LocalhostListenOptions.BindAsync(AddressBindContext context, CancellationToken cancellationToken)
+   at Microsoft.AspNetCore.Server.Kestrel.Core.Internal.AddressBinder.AddressesStrategy.BindAsync(AddressBindContext context, CancellationToken cancellationToken)
+   at Microsoft.AspNetCore.Server.Kestrel.Core.KestrelServerImpl.BindAsync(CancellationToken cancellationToken)
+   at Microsoft.AspNetCore.Server.Kestrel.Core.KestrelServerImpl.StartAsync[TContext](IHttpApplication`1 application, CancellationToken cancellationToken)
+   at Microsoft.AspNetCore.Hosting.GenericWebHostService.StartAsync(CancellationToken cancellationToken)
+   at Microsoft.Extensions.Hosting.Internal.Host.<StartAsync>b__14_1(IHostedService service, CancellationToken token)
+   at Microsoft.Extensions.Hosting.Internal.Host.ForeachService[T](IEnumerable`1 services, CancellationToken token, Boolean concurrent, Boolean abortOnFirstException, List`1 exceptions, Func`3 operation)
+2026-03-20 19:29:56.393 -05:00 [INF] Executed DbCommand (18ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT EXISTS (
+    SELECT 1
+    FROM "DataPools" AS "d")
+2026-03-20 19:29:56.708 -05:00 [INF] User profile is available. Using '/home/JDVD/.aspnet/DataProtection-Keys' as key repository; keys will not be encrypted at rest.
+2026-03-20 19:29:56.854 -05:00 [INF] Now listening on: http://localhost:5034
+2026-03-20 19:29:56.858 -05:00 [INF] Application started. Press Ctrl+C to shut down.
+2026-03-20 19:29:56.858 -05:00 [INF] Hosting environment: Development
+2026-03-20 19:29:56.858 -05:00 [INF] Content root path: /home/JDVD/Escritorio/Onion_arquitecture/WebApi
+2026-03-20 19:29:56.880 -05:00 [INF] No SPA development server running at http://localhost:3000 found.
+2026-03-20 19:30:01.909 -05:00 [ERR] Couldn't start the SPA development server with command 'npm start'.
+2026-03-20 19:32:28.607 -05:00 [INF] Request starting HTTP/1.1 GET http://localhost:5034/api/v1/Dataset - null null
+2026-03-20 19:32:28.619 -05:00 [WRN] Failed to determine the https port for redirect.
+2026-03-20 19:32:28.774 -05:00 [INF] Executing endpoint 'WebApi.Controllers.v1.DatasetController.Get (WebApi)'
+2026-03-20 19:32:28.805 -05:00 [INF] Route matched with {action = "Get", controller = "Dataset"}. Executing controller action with signature System.Threading.Tasks.Task`1[Microsoft.AspNetCore.Mvc.IActionResult] Get() on controller WebApi.Controllers.v1.DatasetController (WebApi).
+2026-03-20 19:32:28.982 -05:00 [INF] Executed DbCommand (0ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT "d"."Id", "d"."BuyerReference", "d"."CommentCount", "d"."Created", "d"."CreatedBy", "d"."DataPoolId", "d"."Description", "d"."LastModified", "d"."LastModifiedBY", "d"."Price", "d"."Status", "d"."Title", "d"."VolunteerCount"
+FROM "Datasets" AS "d"
+2026-03-20 19:32:28.993 -05:00 [INF] Executing OkObjectResult, writing value of type 'Application.Wrappers.ServiceResponse`1[[System.Collections.Generic.IEnumerable`1[[Application.DTOs.DatasetDto, Application, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]'.
+2026-03-20 19:32:29.079 -05:00 [INF] Executed action WebApi.Controllers.v1.DatasetController.Get (WebApi) in 267.0568ms
+2026-03-20 19:32:29.080 -05:00 [INF] Executed endpoint 'WebApi.Controllers.v1.DatasetController.Get (WebApi)'
+2026-03-20 19:32:29.084 -05:00 [INF] HTTP GET /api/v1/Dataset responded 200 in 458.8994 ms
+2026-03-20 19:32:29.099 -05:00 [INF] Request finished HTTP/1.1 GET http://localhost:5034/api/v1/Dataset - 200 null application/json; charset=utf-8 494.666ms
+2026-03-20 19:32:52.551 -05:00 [INF] Request starting HTTP/1.1 POST http://localhost:5034/api/v1/Auth/register - application/json 92
+2026-03-20 19:32:52.564 -05:00 [INF] Executing endpoint 'WebApi.Controllers.v1.AuthController.Register (WebApi)'
+2026-03-20 19:32:52.601 -05:00 [INF] Route matched with {action = "Register", controller = "Auth"}. Executing controller action with signature System.Threading.Tasks.Task`1[Microsoft.AspNetCore.Mvc.IActionResult] Register(WebApi.Models.RegisterRequest) on controller WebApi.Controllers.v1.AuthController (WebApi).
+2026-03-20 19:32:53.010 -05:00 [INF] Executed DbCommand (8ms) [Parameters=[@__normalizedEmail_0='?' (Size = 18)], CommandType='"Text"', CommandTimeout='30']
+SELECT "a"."Id", "a"."AccessFailedCount", "a"."BuyerId", "a"."ConcurrencyStamp", "a"."Email", "a"."EmailConfirmed", "a"."FullName", "a"."LockoutEnabled", "a"."LockoutEnd", "a"."NormalizedEmail", "a"."NormalizedUserName", "a"."PasswordHash", "a"."PayPalEmail", "a"."PhoneNumber", "a"."PhoneNumberConfirmed", "a"."Role", "a"."SecurityStamp", "a"."TwoFactorEnabled", "a"."UserName", "a"."VolunteerId"
+FROM "AspNetUsers" AS "a"
+WHERE "a"."NormalizedEmail" = @__normalizedEmail_0
+LIMIT 2
+2026-03-20 19:32:53.207 -05:00 [INF] Executed DbCommand (6ms) [Parameters=[@__normalizedUserName_0='?' (Size = 18)], CommandType='"Text"', CommandTimeout='30']
+SELECT "a"."Id", "a"."AccessFailedCount", "a"."BuyerId", "a"."ConcurrencyStamp", "a"."Email", "a"."EmailConfirmed", "a"."FullName", "a"."LockoutEnabled", "a"."LockoutEnd", "a"."NormalizedEmail", "a"."NormalizedUserName", "a"."PasswordHash", "a"."PayPalEmail", "a"."PhoneNumber", "a"."PhoneNumberConfirmed", "a"."Role", "a"."SecurityStamp", "a"."TwoFactorEnabled", "a"."UserName", "a"."VolunteerId"
+FROM "AspNetUsers" AS "a"
+WHERE "a"."NormalizedUserName" = @__normalizedUserName_0
+LIMIT 1
+2026-03-20 19:32:53.599 -05:00 [INF] Executed DbCommand (8ms) [Parameters=[@p0='?' (Size = 36), @p1='?' (DbType = Int32), @p2='?' (DbType = Int32), @p3='?' (Size = 36), @p4='?' (Size = 18), @p5='?' (DbType = Boolean), @p6='?' (Size = 10), @p7='?' (DbType = Boolean), @p8='?' (DbType = DateTimeOffset), @p9='?' (Size = 18), @p10='?' (Size = 18), @p11='?' (Size = 84), @p12='?', @p13='?', @p14='?' (DbType = Boolean), @p15='?' (Size = 5), @p16='?' (Size = 32), @p17='?' (DbType = Boolean), @p18='?' (Size = 18), @p19='?' (DbType = Int32)], CommandType='"Text"', CommandTimeout='30']
+INSERT INTO "AspNetUsers" ("Id", "AccessFailedCount", "BuyerId", "ConcurrencyStamp", "Email", "EmailConfirmed", "FullName", "LockoutEnabled", "LockoutEnd", "NormalizedEmail", "NormalizedUserName", "PasswordHash", "PayPalEmail", "PhoneNumber", "PhoneNumberConfirmed", "Role", "SecurityStamp", "TwoFactorEnabled", "UserName", "VolunteerId")
+VALUES (@p0, @p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9, @p10, @p11, @p12, @p13, @p14, @p15, @p16, @p17, @p18, @p19);
+2026-03-20 19:32:53.678 -05:00 [INF] Executing OkObjectResult, writing value of type 'Application.Wrappers.ServiceResponse`1[[System.String, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]'.
+2026-03-20 19:32:53.682 -05:00 [INF] Executed action WebApi.Controllers.v1.AuthController.Register (WebApi) in 1079.7615ms
+2026-03-20 19:32:53.682 -05:00 [INF] Executed endpoint 'WebApi.Controllers.v1.AuthController.Register (WebApi)'
+2026-03-20 19:32:53.682 -05:00 [INF] HTTP POST /api/v1/Auth/register responded 200 in 1130.2168 ms
+2026-03-20 19:32:53.683 -05:00 [INF] Request finished HTTP/1.1 POST http://localhost:5034/api/v1/Auth/register - 200 null application/json; charset=utf-8 1131.706ms
+2026-03-20 19:33:35.881 -05:00 [INF] Request starting HTTP/1.1 GET http://localhost:5034/api/v1/Volunteer - null null
+2026-03-20 19:33:36.013 -05:00 [INF] Executing endpoint 'WebApi.Controllers.v1.VolunteerController.Get (WebApi)'
+2026-03-20 19:33:36.033 -05:00 [INF] Route matched with {action = "Get", controller = "Volunteer"}. Executing controller action with signature System.Threading.Tasks.Task`1[Microsoft.AspNetCore.Mvc.IActionResult] Get() on controller WebApi.Controllers.v1.VolunteerController (WebApi).
+2026-03-20 19:33:36.068 -05:00 [INF] Executed DbCommand (0ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT "v"."Id", "v"."ActivatedDate", "v"."BuyerReference", "v"."CommentCountEstimate", "v"."ContentTypes", "v"."Created", "v"."CreatedBy", "v"."FileLink", "v"."LastModified", "v"."LastModifiedBY", "v"."Notes", "v"."PayPalEmail", "v"."PaymentSent", "v"."PushToken", "v"."Status", "v"."UserId", "v"."YouTubeAccountAge"
+FROM "Volunteers" AS "v"
+2026-03-20 19:33:36.166 -05:00 [INF] Executing OkObjectResult, writing value of type 'Application.Wrappers.ServiceResponse`1[[System.Collections.Generic.IEnumerable`1[[Application.DTOs.VolunteerDto, Application, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]'.
+2026-03-20 19:33:36.188 -05:00 [INF] Executed action WebApi.Controllers.v1.VolunteerController.Get (WebApi) in 154.9544ms
+2026-03-20 19:33:36.188 -05:00 [INF] Executed endpoint 'WebApi.Controllers.v1.VolunteerController.Get (WebApi)'
+2026-03-20 19:33:36.188 -05:00 [INF] HTTP GET /api/v1/Volunteer responded 200 in 305.7838 ms
+2026-03-20 19:33:36.189 -05:00 [INF] Request finished HTTP/1.1 GET http://localhost:5034/api/v1/Volunteer - 200 null application/json; charset=utf-8 307.6695ms
+2026-03-20 19:34:15.825 -05:00 [INF] Request starting HTTP/1.1 PUT http://localhost:5034/api/v1/Volunteer/15/status - application/json 119
+2026-03-20 19:34:15.834 -05:00 [INF] Executing endpoint 'WebApi.Controllers.v1.VolunteerController.UpdateStatus (WebApi)'
+2026-03-20 19:34:15.857 -05:00 [INF] Route matched with {action = "UpdateStatus", controller = "Volunteer"}. Executing controller action with signature System.Threading.Tasks.Task`1[Microsoft.AspNetCore.Mvc.IActionResult] UpdateStatus(Int32, Application.Features.Volunteers.Commands.UpdateVolunteerStatus.UpdateVolunteerStatusCommand) on controller WebApi.Controllers.v1.VolunteerController (WebApi).
+2026-03-20 19:34:15.883 -05:00 [INF] Executing ObjectResult, writing value of type 'Microsoft.AspNetCore.Mvc.ProblemDetails'.
+2026-03-20 19:34:15.926 -05:00 [INF] Executed action WebApi.Controllers.v1.VolunteerController.UpdateStatus (WebApi) in 68.2283ms
+2026-03-20 19:34:15.926 -05:00 [INF] Executed endpoint 'WebApi.Controllers.v1.VolunteerController.UpdateStatus (WebApi)'
+2026-03-20 19:34:15.926 -05:00 [INF] HTTP PUT /api/v1/Volunteer/15/status responded 400 in 100.5770 ms
+2026-03-20 19:34:15.927 -05:00 [INF] Request finished HTTP/1.1 PUT http://localhost:5034/api/v1/Volunteer/15/status - 400 null application/problem+json; charset=utf-8 101.5523ms
+2026-03-20 19:34:51.447 -05:00 [INF] Request starting HTTP/1.1 PUT http://localhost:5034/api/v1/Volunteer/15/status - application/json 117
+2026-03-20 19:34:51.456 -05:00 [INF] Executing endpoint 'WebApi.Controllers.v1.VolunteerController.UpdateStatus (WebApi)'
+2026-03-20 19:34:51.457 -05:00 [INF] Route matched with {action = "UpdateStatus", controller = "Volunteer"}. Executing controller action with signature System.Threading.Tasks.Task`1[Microsoft.AspNetCore.Mvc.IActionResult] UpdateStatus(Int32, Application.Features.Volunteers.Commands.UpdateVolunteerStatus.UpdateVolunteerStatusCommand) on controller WebApi.Controllers.v1.VolunteerController (WebApi).
+2026-03-20 19:34:51.460 -05:00 [INF] Executing ObjectResult, writing value of type 'Microsoft.AspNetCore.Mvc.ProblemDetails'.
+2026-03-20 19:34:51.460 -05:00 [INF] Executed action WebApi.Controllers.v1.VolunteerController.UpdateStatus (WebApi) in 3.0537ms
+2026-03-20 19:34:51.461 -05:00 [INF] Executed endpoint 'WebApi.Controllers.v1.VolunteerController.UpdateStatus (WebApi)'
+2026-03-20 19:34:51.461 -05:00 [INF] HTTP PUT /api/v1/Volunteer/15/status responded 400 in 13.4328 ms
+2026-03-20 19:34:51.461 -05:00 [INF] Request finished HTTP/1.1 PUT http://localhost:5034/api/v1/Volunteer/15/status - 400 null application/problem+json; charset=utf-8 14.1686ms
+2026-03-20 19:35:24.748 -05:00 [INF] Request starting HTTP/1.1 PUT http://localhost:5034/api/v1/Volunteer/15/status - application/json 117
+2026-03-20 19:35:24.749 -05:00 [INF] Executing endpoint 'WebApi.Controllers.v1.VolunteerController.UpdateStatus (WebApi)'
+2026-03-20 19:35:24.749 -05:00 [INF] Route matched with {action = "UpdateStatus", controller = "Volunteer"}. Executing controller action with signature System.Threading.Tasks.Task`1[Microsoft.AspNetCore.Mvc.IActionResult] UpdateStatus(Int32, Application.Features.Volunteers.Commands.UpdateVolunteerStatus.UpdateVolunteerStatusCommand) on controller WebApi.Controllers.v1.VolunteerController (WebApi).
+2026-03-20 19:35:24.751 -05:00 [INF] Executing ObjectResult, writing value of type 'Microsoft.AspNetCore.Mvc.ProblemDetails'.
+2026-03-20 19:35:24.751 -05:00 [INF] Executed action WebApi.Controllers.v1.VolunteerController.UpdateStatus (WebApi) in 1.6739ms
+2026-03-20 19:35:24.752 -05:00 [INF] Executed endpoint 'WebApi.Controllers.v1.VolunteerController.UpdateStatus (WebApi)'
+2026-03-20 19:35:24.752 -05:00 [INF] HTTP PUT /api/v1/Volunteer/15/status responded 400 in 3.3660 ms
+2026-03-20 19:35:24.752 -05:00 [INF] Request finished HTTP/1.1 PUT http://localhost:5034/api/v1/Volunteer/15/status - 400 null application/problem+json; charset=utf-8 3.9047ms
+2026-03-20 19:36:30.904 -05:00 [INF] Request starting HTTP/1.1 PUT http://localhost:5034/api/v1/Volunteer/15/status - application/json 125
+2026-03-20 19:36:30.906 -05:00 [INF] Executing endpoint 'WebApi.Controllers.v1.VolunteerController.UpdateStatus (WebApi)'
+2026-03-20 19:36:30.906 -05:00 [INF] Route matched with {action = "UpdateStatus", controller = "Volunteer"}. Executing controller action with signature System.Threading.Tasks.Task`1[Microsoft.AspNetCore.Mvc.IActionResult] UpdateStatus(Int32, Application.Features.Volunteers.Commands.UpdateVolunteerStatus.UpdateVolunteerStatusCommand) on controller WebApi.Controllers.v1.VolunteerController (WebApi).
+2026-03-20 19:36:30.971 -05:00 [INF] Executed DbCommand (1ms) [Parameters=[@__p_0='?' (DbType = Int32)], CommandType='"Text"', CommandTimeout='30']
+SELECT "v"."Id", "v"."ActivatedDate", "v"."BuyerReference", "v"."CommentCountEstimate", "v"."ContentTypes", "v"."Created", "v"."CreatedBy", "v"."FileLink", "v"."LastModified", "v"."LastModifiedBY", "v"."Notes", "v"."PayPalEmail", "v"."PaymentSent", "v"."PushToken", "v"."Status", "v"."UserId", "v"."YouTubeAccountAge"
+FROM "Volunteers" AS "v"
+WHERE "v"."Id" = @__p_0
+LIMIT 1
+2026-03-20 19:36:31.035 -05:00 [INF] Executed DbCommand (1ms) [Parameters=[@p16='?' (DbType = Int32), @p0='?' (DbType = DateTime), @p1='?' (Size = 8), @p2='?' (Size = 1), @p3='?' (Size = 3), @p4='?' (DbType = DateTime), @p5='?' (Size = 6), @p6='?', @p7='?' (DbType = DateTime), @p8='?' (Size = 6), @p9='?' (Size = 22), @p10='?', @p11='?' (DbType = Boolean), @p12='?', @p13='?' (DbType = Int32), @p14='?' (Size = 36), @p15='?' (Size = 3)], CommandType='"Text"', CommandTimeout='30']
+UPDATE "Volunteers" SET "ActivatedDate" = @p0, "BuyerReference" = @p1, "CommentCountEstimate" = @p2, "ContentTypes" = @p3, "Created" = @p4, "CreatedBy" = @p5, "FileLink" = @p6, "LastModified" = @p7, "LastModifiedBY" = @p8, "Notes" = @p9, "PayPalEmail" = @p10, "PaymentSent" = @p11, "PushToken" = @p12, "Status" = @p13, "UserId" = @p14, "YouTubeAccountAge" = @p15
+WHERE "Id" = @p16
+RETURNING 1;
+2026-03-20 19:36:31.046 -05:00 [INF] Executing OkObjectResult, writing value of type 'Application.Wrappers.ServiceResponse`1[[Application.DTOs.VolunteerDto, Application, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]'.
+2026-03-20 19:36:31.051 -05:00 [INF] Executed action WebApi.Controllers.v1.VolunteerController.UpdateStatus (WebApi) in 144.439ms
+2026-03-20 19:36:31.051 -05:00 [INF] Executed endpoint 'WebApi.Controllers.v1.VolunteerController.UpdateStatus (WebApi)'
+2026-03-20 19:36:31.051 -05:00 [INF] HTTP PUT /api/v1/Volunteer/15/status responded 200 in 146.7681 ms
+2026-03-20 19:36:31.051 -05:00 [INF] Request finished HTTP/1.1 PUT http://localhost:5034/api/v1/Volunteer/15/status - 200 null application/json; charset=utf-8 147.7769ms
+2026-03-20 19:36:58.493 -05:00 [INF] Request starting HTTP/1.1 POST http://localhost:5034/api/v1/Dataset - application/json 82
+2026-03-20 19:36:58.495 -05:00 [INF] Executing endpoint 'WebApi.Controllers.v1.DatasetController.Post (WebApi)'
+2026-03-20 19:36:58.519 -05:00 [INF] Route matched with {action = "Post", controller = "Dataset"}. Executing controller action with signature System.Threading.Tasks.Task`1[Microsoft.AspNetCore.Mvc.IActionResult] Post(Application.Features.Datasets.Commands.CreateDataset.CreateDatasetCommand) on controller WebApi.Controllers.v1.DatasetController (WebApi).
+2026-03-20 19:36:58.700 -05:00 [INF] Executed DbCommand (5ms) [Parameters=[@p0='?', @p1='?' (DbType = Int32), @p2='?' (DbType = DateTime), @p3='?' (Size = 6), @p4='?' (DbType = Int32), @p5='?' (Size = 23), @p6='?' (DbType = DateTime), @p7='?' (Size = 6), @p8='?' (DbType = Decimal), @p9='?' (Size = 9), @p10='?' (Size = 16), @p11='?' (DbType = Int32)], CommandType='"Text"', CommandTimeout='30']
+INSERT INTO "Datasets" ("BuyerReference", "CommentCount", "Created", "CreatedBy", "DataPoolId", "Description", "LastModified", "LastModifiedBY", "Price", "Status", "Title", "VolunteerCount")
+VALUES (@p0, @p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9, @p10, @p11)
+RETURNING "Id";
+2026-03-20 19:36:58.735 -05:00 [INF] Executing OkObjectResult, writing value of type 'Application.Wrappers.ServiceResponse`1[[Application.DTOs.DatasetDto, Application, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]'.
+2026-03-20 19:36:58.745 -05:00 [INF] Executed action WebApi.Controllers.v1.DatasetController.Post (WebApi) in 226.2943ms
+2026-03-20 19:36:58.745 -05:00 [INF] Executed endpoint 'WebApi.Controllers.v1.DatasetController.Post (WebApi)'
+2026-03-20 19:36:58.746 -05:00 [INF] HTTP POST /api/v1/Dataset responded 200 in 251.8020 ms
+2026-03-20 19:36:58.746 -05:00 [INF] Request finished HTTP/1.1 POST http://localhost:5034/api/v1/Dataset - 200 null application/json; charset=utf-8 252.674ms
+2026-03-20 20:31:40.691 -05:00 [INF] Application is shutting down...
+migration application. See https://aka.ms/efcore-docs-migrations-lock for more information if this takes too long.
+2026-03-20 19:53:34.228 -05:00 [INF] Executed DbCommand (23ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT COUNT(*) FROM "sqlite_master" WHERE "name" = '__EFMigrationsLock' AND "type" = 'table';
+2026-03-20 19:53:34.244 -05:00 [INF] Executed DbCommand (5ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+CREATE TABLE IF NOT EXISTS "__EFMigrationsLock" (
+    "Id" INTEGER NOT NULL CONSTRAINT "PK___EFMigrationsLock" PRIMARY KEY,
+    "Timestamp" TEXT NOT NULL
+);
+2026-03-20 19:53:34.248 -05:00 [INF] Executed DbCommand (2ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+INSERT OR IGNORE INTO "__EFMigrationsLock"("Id", "Timestamp") VALUES(1, '2026-03-21 00:53:34.2460624+00:00');
+SELECT changes();
+2026-03-20 19:53:34.359 -05:00 [INF] Executed DbCommand (0ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+CREATE TABLE IF NOT EXISTS "__EFMigrationsHistory" (
+    "MigrationId" TEXT NOT NULL CONSTRAINT "PK___EFMigrationsHistory" PRIMARY KEY,
+    "ProductVersion" TEXT NOT NULL
+);
+2026-03-20 19:53:34.374 -05:00 [INF] Executed DbCommand (0ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT COUNT(*) FROM "sqlite_master" WHERE "name" = '__EFMigrationsHistory' AND "type" = 'table';
+2026-03-20 19:53:34.379 -05:00 [INF] Executed DbCommand (1ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT "MigrationId", "ProductVersion"
+FROM "__EFMigrationsHistory"
+ORDER BY "MigrationId";
+2026-03-20 19:53:34.407 -05:00 [INF] Applying migration '20260321005259_AddSpotifyListeningRecords'.
+2026-03-20 19:53:34.496 -05:00 [ERR] The migration operation 'PRAGMA foreign_keys = 0;
+' from migration 'AddSpotifyListeningRecords' cannot be executed in a transaction. If the app is terminated or an unrecoverable error occurs while this operation is being executed then the migration will be left in a partially applied state and would need to be reverted manually before it can be applied again. Create a separate migration that contains just this operation.
+2026-03-20 19:53:34.497 -05:00 [INF] Executed DbCommand (1ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+ALTER TABLE "Volunteers" ADD "DataSourceType" INTEGER NOT NULL DEFAULT 0;
+2026-03-20 19:53:34.502 -05:00 [ERR] Failed executing DbCommand (3ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+ALTER TABLE "Datasets" ADD "DataPoolId" INTEGER NULL;
+2026-03-20 19:59:52.432 -05:00 [INF] Acquiring an exclusive lock for migration application. See https://aka.ms/efcore-docs-migrations-lock for more information if this takes too long.
+2026-03-20 19:59:52.614 -05:00 [INF] Executed DbCommand (25ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT COUNT(*) FROM "sqlite_master" WHERE "name" = '__EFMigrationsLock' AND "type" = 'table';
+2026-03-20 19:59:52.631 -05:00 [INF] Executed DbCommand (5ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+INSERT OR IGNORE INTO "__EFMigrationsLock"("Id", "Timestamp") VALUES(1, '2026-03-21 00:59:52.6257318+00:00');
+SELECT changes();
+2026-03-20 19:59:52.761 -05:00 [INF] Executed DbCommand (1ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+CREATE TABLE IF NOT EXISTS "__EFMigrationsHistory" (
+    "MigrationId" TEXT NOT NULL CONSTRAINT "PK___EFMigrationsHistory" PRIMARY KEY,
+    "ProductVersion" TEXT NOT NULL
+);
+2026-03-20 19:59:52.777 -05:00 [INF] Executed DbCommand (0ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT COUNT(*) FROM "sqlite_master" WHERE "name" = '__EFMigrationsHistory' AND "type" = 'table';
+2026-03-20 19:59:52.782 -05:00 [INF] Executed DbCommand (1ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT "MigrationId", "ProductVersion"
+FROM "__EFMigrationsHistory"
+ORDER BY "MigrationId";
+2026-03-20 19:59:52.811 -05:00 [INF] Applying migration '20260321005259_AddSpotifyListeningRecords'.
+2026-03-20 19:59:52.860 -05:00 [INF] Executed DbCommand (0ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+CREATE TABLE "SpotifyListeningRecords" (
+    "Id" INTEGER NOT NULL CONSTRAINT "PK_SpotifyListeningRecords" PRIMARY KEY AUTOINCREMENT,
+    "VolunteerId" INTEGER NOT NULL,
+    "TrackName" TEXT NOT NULL,
+    "ArtistName" TEXT NOT NULL,
+    "AlbumName" TEXT NOT NULL,
+    "PlayedAt" TEXT NOT NULL,
+    "MsPlayed" INTEGER NOT NULL,
+    "IsAnonymized" INTEGER NOT NULL,
+    "Platform" TEXT NOT NULL,
+    "CreatedBy" TEXT NULL,
+    "Created" TEXT NOT NULL,
+    "LastModifiedBY" TEXT NULL,
+    "LastModified" TEXT NULL
+);
+2026-03-20 19:59:52.861 -05:00 [INF] Executed DbCommand (0ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20260321005259_AddSpotifyListeningRecords', '9.0.0');
+2026-03-20 19:59:52.871 -05:00 [INF] Executed DbCommand (1ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+DELETE FROM "__EFMigrationsLock";
+2026-03-20 20:00:17.122 -05:00 [INF] Acquiring an exclusive lock for migration application. See https://aka.ms/efcore-docs-migrations-lock for more information if this takes too long.
+2026-03-20 20:00:17.257 -05:00 [INF] Executed DbCommand (22ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT COUNT(*) FROM "sqlite_master" WHERE "name" = '__EFMigrationsLock' AND "type" = 'table';
+2026-03-20 20:00:17.276 -05:00 [INF] Executed DbCommand (7ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+INSERT OR IGNORE INTO "__EFMigrationsLock"("Id", "Timestamp") VALUES(1, '2026-03-21 01:00:17.2681313+00:00');
+SELECT changes();
+2026-03-20 20:00:17.391 -05:00 [INF] Executed DbCommand (1ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+CREATE TABLE IF NOT EXISTS "__EFMigrationsHistory" (
+    "MigrationId" TEXT NOT NULL CONSTRAINT "PK___EFMigrationsHistory" PRIMARY KEY,
+    "ProductVersion" TEXT NOT NULL
+);
+2026-03-20 20:00:17.407 -05:00 [INF] Executed DbCommand (0ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT COUNT(*) FROM "sqlite_master" WHERE "name" = '__EFMigrationsHistory' AND "type" = 'table';
+2026-03-20 20:00:17.412 -05:00 [INF] Executed DbCommand (1ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT "MigrationId", "ProductVersion"
+FROM "__EFMigrationsHistory"
+ORDER BY "MigrationId";
+2026-03-20 20:00:17.434 -05:00 [INF] No migrations were applied. The database is already up to date.
+2026-03-20 20:00:17.441 -05:00 [INF] Executed DbCommand (2ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+DELETE FROM "__EFMigrationsLock";
+2026-03-20 20:22:05.392 -05:00 [INF] Acquiring an exclusive lock for migration application. See https://aka.ms/efcore-docs-migrations-lock for more information if this takes too long.
+2026-03-20 20:22:05.564 -05:00 [INF] Executed DbCommand (28ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT COUNT(*) FROM "sqlite_master" WHERE "name" = '__EFMigrationsLock' AND "type" = 'table';
+2026-03-20 20:22:05.581 -05:00 [INF] Executed DbCommand (4ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+INSERT OR IGNORE INTO "__EFMigrationsLock"("Id", "Timestamp") VALUES(1, '2026-03-21 01:22:05.5759589+00:00');
+SELECT changes();
+2026-03-20 20:22:05.694 -05:00 [INF] Executed DbCommand (1ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+CREATE TABLE IF NOT EXISTS "__EFMigrationsHistory" (
+    "MigrationId" TEXT NOT NULL CONSTRAINT "PK___EFMigrationsHistory" PRIMARY KEY,
+    "ProductVersion" TEXT NOT NULL
+);
+2026-03-20 20:22:05.710 -05:00 [INF] Executed DbCommand (0ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT COUNT(*) FROM "sqlite_master" WHERE "name" = '__EFMigrationsHistory' AND "type" = 'table';
+2026-03-20 20:22:05.715 -05:00 [INF] Executed DbCommand (1ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT "MigrationId", "ProductVersion"
+FROM "__EFMigrationsHistory"
+ORDER BY "MigrationId";
+2026-03-20 20:22:05.744 -05:00 [INF] Applying migration '20260321012100_AddNetflixViewingRecords'.
+2026-03-20 20:22:05.784 -05:00 [INF] Executed DbCommand (0ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+CREATE TABLE "NetflixViewingRecords" (
+    "Id" INTEGER NOT NULL CONSTRAINT "PK_NetflixViewingRecords" PRIMARY KEY AUTOINCREMENT,
+    "VolunteerId" INTEGER NOT NULL,
+    "Title" TEXT NOT NULL,
+    "ShowTitle" TEXT NOT NULL,
+    "WatchedDate" TEXT NOT NULL,
+    "DurationMinutes" INTEGER NOT NULL,
+    "DeviceType" TEXT NOT NULL,
+    "Country" TEXT NOT NULL,
+    "IsAnonymized" INTEGER NOT NULL,
+    "CreatedBy" TEXT NULL,
+    "Created" TEXT NOT NULL,
+    "LastModifiedBY" TEXT NULL,
+    "LastModified" TEXT NULL
+);
+2026-03-20 20:22:05.785 -05:00 [INF] Executed DbCommand (0ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20260321012100_AddNetflixViewingRecords', '9.0.0');
+2026-03-20 20:22:05.793 -05:00 [INF] Executed DbCommand (1ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+DELETE FROM "__EFMigrationsLock";
+2026-03-20 20:22:39.650 -05:00 [INF] Acquiring an exclusive lock for migration application. See https://aka.ms/efcore-docs-migrations-lock for more information if this takes too long.
+2026-03-20 20:22:39.789 -05:00 [INF] Executed DbCommand (22ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT COUNT(*) FROM "sqlite_master" WHERE "name" = '__EFMigrationsLock' AND "type" = 'table';
+2026-03-20 20:22:39.811 -05:00 [INF] Executed DbCommand (10ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+INSERT OR IGNORE INTO "__EFMigrationsLock"("Id", "Timestamp") VALUES(1, '2026-03-21 01:22:39.800032+00:00');
+SELECT changes();
+2026-03-20 20:22:39.935 -05:00 [INF] Executed DbCommand (1ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+CREATE TABLE IF NOT EXISTS "__EFMigrationsHistory" (
+    "MigrationId" TEXT NOT NULL CONSTRAINT "PK___EFMigrationsHistory" PRIMARY KEY,
+    "ProductVersion" TEXT NOT NULL
+);
+2026-03-20 20:22:39.952 -05:00 [INF] Executed DbCommand (0ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT COUNT(*) FROM "sqlite_master" WHERE "name" = '__EFMigrationsHistory' AND "type" = 'table';
+2026-03-20 20:22:39.957 -05:00 [INF] Executed DbCommand (1ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT "MigrationId", "ProductVersion"
+FROM "__EFMigrationsHistory"
+ORDER BY "MigrationId";
+2026-03-20 20:22:39.981 -05:00 [INF] No migrations were applied. The database is already up to date.
+2026-03-20 20:22:39.993 -05:00 [INF] Executed DbCommand (6ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+DELETE FROM "__EFMigrationsLock";

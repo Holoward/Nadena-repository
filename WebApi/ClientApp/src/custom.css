@@ -1,0 +1,125 @@
+/* Primary Color: Navy #1a2f4a */
+
+/* Links */
+a {
+  color: #1a2f4a;
+}
+
+a:hover {
+  color: #13223a;
+}
+
+/* Code */
+code {
+  color: #E01A76;
+}
+
+/* Primary Buttons */
+.btn-primary {
+  color: #fff;
+  background-color: #1a2f4a;
+  border-color: #1a2f4a;
+}
+
+.btn-primary:hover {
+  color: #fff;
+  background-color: #13223a;
+  border-color: #0f1c2e;
+}
+
+.btn-primary:focus,
+.btn-primary.focus {
+  box-shadow: 0 0 0 0.2rem rgba(26, 47, 74, 0.5);
+}
+
+.btn-primary:disabled,
+.btn-primary.disabled {
+  background-color: #1a2f4a;
+  border-color: #1a2f4a;
+}
+
+/* Secondary Buttons */
+.btn-secondary {
+  background-color: #1a2f4a;
+  border-color: #1a2f4a;
+}
+
+/* Navbar */
+.navbar {
+  background-color: #1a2f4a !important;
+}
+
+.navbar-brand {
+  color: #fff !important;
+}
+
+.nav-link {
+  color: rgba(255, 255, 255, 0.8) !important;
+}
+
+.nav-link:hover {
+  color: #fff !important;
+}
+
+/* Cards */
+.card {
+  border-color: #1a2f4a;
+}
+
+.card-header {
+  background-color: #1a2f4a;
+  color: #fff;
+}
+
+/* Forms */
+.form-control:focus {
+  border-color: #1a2f4a;
+  box-shadow: 0 0 0 0.2rem rgba(26, 47, 74, 0.25);
+}
+
+/* Custom border color */
+.border-primary {
+  border-color: #1a2f4a !important;
+}
+
+/* Text colors */
+.text-primary {
+  color: #1a2f4a !important;
+}
+
+/* Background colors */
+.bg-primary {
+  background-color: #1a2f4a !important;
+}
+
+/* Progress bars */
+.progress-bar {
+  background-color: #1a2f4a;
+}
+
+/* Badges */
+.badge.bg-primary {
+  background-color: #1a2f4a !important;
+}
+
+/* Table headers */
+thead {
+  background-color: #1a2f4a;
+  color: #fff;
+}
+
+/* Active route */
+.active {
+  color: #fff !important;
+  background-color: #13223a;
+}
+
+/* Page background */
+body {
+  background-color: #f8f9fa;
+}
+
+/* Container styling */
+.container {
+  background-color: transparent;
+}

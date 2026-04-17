@@ -1,0 +1,29 @@
+[Unit]
+Description=Nadena Consent-Based Data Monetization Platform
+After=network.target
+Wants=network-online.target
+
+[Service]
+WorkingDirectory=/var/nadena
+ExecStart=/usr/bin/dotnet /var/nadena/WebApi.dll
+Restart=always
+RestartSec=10
+KillSignal=SIGTERM
+SyslogIdentifier=nadena
+User=nadena
+Group=nadena
+
+Environment=ASPNETCORE_ENVIRONMENT=Production
+Environment=ASPNETCORE_URLS=http://localhost:5034
+Environment=DOTNET_PRINT_TELEMETRY_MESSAGE=false
+
+# Secrets — set these in /etc/nadena/environment or via systemd-creds
+EnvironmentFile=/etc/nadena/environment
+
+# Resource limits
+LimitNOFILE=65536
+MemoryMax=1G
+CPUQuota=80%
+
+[Install]
+WantedBy=multi-user.target
