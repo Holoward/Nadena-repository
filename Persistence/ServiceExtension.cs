@@ -75,6 +75,11 @@ public static class ServiceExtension
         services.AddScoped<ISurveyRepository, SurveyRepository>();
 
         services.AddScoped<DataPoolService>();
+        services.AddScoped<ITakeoutValidationService, TakeoutValidationService>();
+        services.AddScoped<IDataDeliveryService, DataDeliveryService>();
+        services.AddScoped<IContributorOAuthTokenRepository, ContributorOAuthTokenRepository>();
+        services.AddScoped<IGoogleDriveService, GoogleDriveService>();
+        services.AddHostedService<DrivePollingService>();
     }
 
     private static string BuildSqliteConnectionString(string? configuredConnectionString, string contentRootPath)

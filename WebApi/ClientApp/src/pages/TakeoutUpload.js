@@ -1,314 +1,268 @@
-import React, { useState } from 'react';
-import { Container, Row, Col, Card, CardBody, CardTitle, Button, Alert, Spinner } from 'reactstrap';
-import { useHistory } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import { FaGoogle, FaYoutube, FaUpload, FaInfoCircle, FaCheck, FaChartLine } from 'react-icons/fa';
+import React, { useState, useEffect } from 'react';
 
-const categorizeUploadError = (error, responseStatus) => {
-    // Server unreachable (network error)
-    if (error && (error.includes('Failed to fetch') || error.includes('Network error') || error.includes('network'))) {
-        return {
-            message: "We couldn't reach the Nadena server. Please check your internet connection and try again.",
-            type: 'network'
-        };
-    }
-    
-    // Auth expired
-    if (responseStatus === 401 || (error && (error.toLowerCase().includes('expired') || error.toLowerCase().includes('unauthorized') || error.toLowerCase().includes('authenticated')))) {
-        return {
-            message: "Your session has expired. Please log in again.",
-            type: 'auth',
-            redirect: true
-        };
-    }
-    
-    // Backend error messages mapped to user-friendly messages
-    const errorMappings = [
-        {
-            patterns: ['watch-history.json was not found', 'not found in the uploaded', 'not found'],
-            message: "We couldn't find your watch history in this file. Make sure you selected 'YouTube and YouTube Music' when creating your Google Takeout export."
-        },
-        {
-            patterns: ['did not contain any records', 'empty', 'no records'],
-            message: "Your watch history appears to be empty. This can happen if you've cleared your YouTube history. You need at least some watch history to contribute."
-        },
-        {
-            patterns: ['not a valid ZIP', 'invalid data', 'invalid zip', 'not a valid'],
-            message: "This doesn't look like a Google Takeout ZIP file. Please download your data directly from takeout.google.com."
-        },
-        {
-            patterns: ['no valid YouTube watch events', 'no valid', 'could not be parsed'],
-            message: "We couldn't find any valid watch events in your file. Make sure you exported watch history."
-        }
-    ];
-    
-    if (error) {
-        for (const mapping of errorMappings) {
-            if (mapping.patterns.some(p => error.toLowerCase().includes(p.toLowerCase()))) {
-                return { message: mapping.message };
-            }
-        }
-    }
-    
-    // Default error
-    return { message: error || 'An unexpected error occurred. Please try again.' };
+const STEPS = ['Connect Google', 'Request export', 'Upload file', 'Done'];
+
+const styles = {
+  container: { maxWidth: 480, margin: '0 auto', padding: '24px 16px', fontFamily: 'sans-serif' },
+  stepper: { display: 'flex', justifyContent: 'space-between', marginBottom: 32 },
+  step: (active) => ({
+    flex: 1, textAlign: 'center', fontSize: 11,
+    fontWeight: active ? 700 : 400,
+    color: active ? '#6c47ff' : '#999',
+    borderBottom: active ? '2px solid #6c47ff' : '2px solid #eee',
+    paddingBottom: 8
+  }),
+  title: { fontSize: 22, fontWeight: 700, marginBottom: 12 },
+  body: { fontSize: 15, color: '#444', lineHeight: 1.6, marginBottom: 24 },
+  badge: {
+    display: 'inline-block', background: '#e8f5e9', color: '#2e7d32',
+    borderRadius: 20, padding: '4px 12px', fontSize: 13, marginBottom: 16
+  },
+  button: {
+    display: 'block', width: '100%', padding: '16px',
+    background: '#6c47ff', color: '#fff', border: 'none',
+    borderRadius: 10, fontSize: 16, fontWeight: 600,
+    cursor: 'pointer', marginBottom: 12, minHeight: 52
+  },
+  googleButton: {
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    width: '100%', padding: '16px',
+    background: '#fff', color: '#333',
+    border: '1.5px solid #ddd', borderRadius: 10,
+    fontSize: 16, fontWeight: 600,
+    cursor: 'pointer', marginBottom: 12, minHeight: 52, gap: 10
+  },
+  secondaryButton: {
+    display: 'block', width: '100%', padding: '16px',
+    background: '#f0edff', color: '#6c47ff', border: 'none',
+    borderRadius: 10, fontSize: 16, fontWeight: 600,
+    cursor: 'pointer', marginBottom: 12, minHeight: 52
+  },
+  input: {
+    display: 'block', width: '100%', padding: '14px',
+    border: '1px solid #ddd', borderRadius: 10,
+    fontSize: 15, marginBottom: 16, boxSizing: 'border-box'
+  },
+  fileBox: {
+    display: 'block', width: '100%', padding: '20px',
+    border: '2px dashed #6c47ff', borderRadius: 10,
+    textAlign: 'center', color: '#6c47ff', fontSize: 15,
+    cursor: 'pointer', marginBottom: 16, boxSizing: 'border-box',
+    background: '#f9f8ff'
+  },
+  error: { color: '#c0392b', fontSize: 14, marginBottom: 12 },
+  success: { fontSize: 16, color: '#27ae60', fontWeight: 600, marginBottom: 8 },
+  stat: { fontSize: 14, color: '#555', marginBottom: 4 },
+  note: { fontSize: 12, color: '#888', marginTop: 8, lineHeight: 1.5 }
 };
 
-const TakeoutUploadPage = () => {
-    const history = useHistory();
-    const { auth } = useAuth();
-    const [file, setFile] = useState(null);
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState(null);
-    const [success, setSuccess] = useState(false);
-    const [stats, setStats] = useState(null);
+export default function TakeoutUpload() {
+  const [step, setStep] = useState(0);
+  const [file, setFile] = useState(null);
+  const [email, setEmail] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [result, setResult] = useState(null);
+  const [oauthStatus, setOauthStatus] = useState(null);
 
-    const userId = auth.user?.id || auth.user?.sub;
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const oauth = params.get('oauth');
+    if (oauth === 'success') {
+      setOauthStatus('success');
+      setStep(1);
+      window.history.replaceState({}, '', '/upload');
+    } else if (oauth) {
+      setOauthStatus(oauth);
+    }
+  }, []);
 
-    const handleFileChange = (e) => {
-        const selectedFile = e.target.files[0];
-        if (selectedFile) {
-            if (!selectedFile.name.endsWith('.zip')) {
-                setError('Only ZIP files are accepted. Please upload a Google Takeout ZIP file.');
-                return;
-            }
-            if (selectedFile.size > 500 * 1024 * 1024) {
-                setError('Your file is too large to upload directly. Please contact david@nadena.tech and we\'ll arrange an alternative upload.');
-                return;
-            }
-            setFile(selectedFile);
-            setError(null);
-        }
-    };
+  const handleConnectGoogle = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      const res = await fetch('/api/v1/oauth/google-url', {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
+      const data = await res.json();
+      if (res.ok && data.url) {
+        window.location.href = data.url;
+      } else {
+        setError('Could not start Google authorization. Please try again.');
+      }
+    } catch {
+      setError('Network error. Please check your connection.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    const handleUpload = async () => {
-        if (!file) {
-            setError('Please select a file to upload.');
-            return;
-        }
-
-        setLoading(true);
-        setError(null);
-
-        let responseStatus = null;
-
-        try {
-            const formData = new FormData();
-            formData.append('zipFile', file);
-
-            const response = await fetch('/api/v1/takeout/upload', {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${auth.token}`
-                },
-                body: formData
-            });
-
-            responseStatus = response.status;
-            const data = await response.json();
-
-            if (!response.ok) {
-                const categorizedError = categorizeUploadError(data.message, response.status);
-                
-                if (categorizedError.redirect) {
-                    setError(categorizedError.message);
-                    setTimeout(() => {
-                        history.push('/login');
-                    }, 3000);
-                    setLoading(false);
-                    return;
-                } else {
-                    throw new Error(categorizedError.message);
-                }
-            }
-
-            // Now fetch the stats
-            const statsResponse = await fetch(`/api/v1/takeout/stats/${userId}`, {
-                headers: { 'Authorization': `Bearer ${auth.token}` }
-            });
-
-            const statsData = await statsResponse.json();
-
-            if (!statsResponse.ok) {
-                // Even if stats fail, show success since upload worked
-                setSuccess(true);
-                setLoading(false);
-                return;
-            }
-
-            setStats(statsData.data);
-            setSuccess(true);
-        } catch (err) {
-            const errorMessage = err.message || 'An error occurred. Please try again.';
-            setError(errorMessage);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleContinue = () => {
-        if (stats) {
-            sessionStorage.setItem('contributorStats', JSON.stringify(stats));
-        }
-        history.push('/stats');
-    };
-
-    return (
-        <Container className="py-5" style={{ minHeight: '80vh' }}>
-            <Row className="justify-content-center">
-                <Col md="10" lg="8">
-                    <div className="text-center mb-5">
-                        <h2 className="font-weight-bold" style={{ color: '#00D1FF' }}>
-                            Upload Your YouTube Watch History
-                        </h2>
-                        <p className="text-muted">
-                            Help researchers understand how you watch YouTube by uploading your Google Takeout data.
-                        </p>
-                    </div>
-
-                    <Card className="mb-4 shadow-sm">
-                        <CardBody>
-                            <CardTitle tag="h5" className="mb-3">
-                                <FaGoogle className="mr-2" />
-                                What is Google Takeout?
-                            </CardTitle>
-                            <p style={{ color: '#555' }}>
-                                Google Takeout is a service that lets you download a copy of all your data stored in your Google account,
-                                including your YouTube watch history.
-                            </p>
-                            <a
-                                href="https://takeout.google.com"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="btn btn-outline-primary btn-sm"
-                            >
-                                <FaYoutube className="mr-1" />
-                                Go to takeout.google.com
-                            </a>
-                        </CardBody>
-                    </Card>
-
-                    <Card className="mb-4 shadow-sm">
-                        <CardBody>
-                            <CardTitle tag="h5" className="mb-3">
-                                Step-by-Step Instructions
-                            </CardTitle>
-                            <ol style={{ color: '#555', lineHeight: '1.8' }}>
-                                <li className="mb-2">
-                                    Go to <strong>takeout.google.com</strong> and sign in with your Google account
-                                </li>
-                                <li className="mb-2">
-                                    Click <strong>"Deselect all"</strong> at the top, then find and select only <strong>"YouTube"</strong> and <strong>"YouTube Music"</strong> (or "YouTube and YouTube Music")
-                                </li>
-                                <li className="mb-2">
-                                    Under <strong>"Multiple formats"</strong> (or "File delivery method"), change the format for <strong>"Watch history"</strong> from HTML to <strong>JSON</strong>
-                                </li>
-                                <li className="mb-2">
-                                    Click <strong>"Next step"</strong> and then <strong>"Create export"</strong>
-                                </li>
-                                <li className="mb-2">
-                                    Wait for the email notification, then <strong>download the ZIP file</strong>
-                                </li>
-                                <li className="mb-2">
-                                    Upload that ZIP file below
-                                </li>
-                            </ol>
-                        </CardBody>
-                    </Card>
-
-                    {error && (
-                        <Alert color="danger" className="mb-4">
-                            {error}
-                        </Alert>
-                    )}
-
-                    {success && stats ? (
-                        <Card className="mb-4 shadow-sm" style={{ borderColor: '#28a745', borderWidth: 2 }}>
-                            <CardBody>
-                                <div className="text-center mb-4">
-                                    <FaCheck size={40} color="#28a745" />
-                                    <h4 className="mt-3 text-success">Upload Successful!</h4>
-                                </div>
-                                <Row className="text-center">
-                                    <Col md="4" className="mb-3">
-                                        <div style={{ fontSize: 24, fontWeight: 700 }}>{stats.data?.totalVideos?.toLocaleString() || 0}</div>
-                                        <div className="text-muted">Total Videos</div>
-                                    </Col>
-                                    <Col md="4" className="mb-3">
-                                        <div style={{ fontSize: 24, fontWeight: 700 }}>{stats.data?.uniqueChannels?.toLocaleString() || 0}</div>
-                                        <div className="text-muted">Unique Channels</div>
-                                    </Col>
-                                    <Col md="4" className="mb-3">
-                                        <div style={{ fontSize: 24, fontWeight: 700 }}>{stats.data?.historyDays || 0}</div>
-                                        <div className="text-muted">Days of History</div>
-                                    </Col>
-                                </Row>
-                                <Alert color="info" className="mt-3">
-                                    <FaChartLine className="mr-2" />
-                                    Here is what will be shared if you consent.
-                                </Alert>
-                                <Button
-                                    color="success"
-                                    block
-                                    size="lg"
-                                    onClick={handleContinue}
-                                    style={{ background: 'linear-gradient(90deg, #28a745 0%, #20c997 100%)', border: 'none' }}
-                                >
-                                    Continue to Preview
-                                </Button>
-                            </CardBody>
-                        </Card>
-                    ) : (
-                        <Card className="shadow-sm" style={{ borderColor: '#00D1FF', borderWidth: 2 }}>
-                            <CardBody>
-                                <div className="text-center mb-4">
-                                    <FaUpload size={40} color="#00D1FF" />
-                                </div>
-
-                                <div className="text-center mb-4">
-                                    <input
-                                        type="file"
-                                        accept=".zip"
-                                        onChange={handleFileChange}
-                                        id="zip-file-input"
-                                        style={{ display: 'none' }}
-                                    />
-                                    <label htmlFor="zip-file-input" className="btn btn-outline-primary btn-lg">
-                                        {file ? file.name : 'Select ZIP File'}
-                                    </label>
-                                    {file && (
-                                        <div className="mt-2 text-muted">
-                                            {(file.size / 1024 / 1024).toFixed(2)} MB
-                                        </div>
-                                    )}
-                                </div>
-
-                                <Button
-                                    color="primary"
-                                    block
-                                    size="lg"
-                                    onClick={handleUpload}
-                                    disabled={loading || !file}
-                                    style={{
-                                        background: 'linear-gradient(90deg, #00D1FF 0%, #0033FF 100%)',
-                                        border: 'none'
-                                    }}
-                                >
-                                    {loading ? <Spinner size="sm" /> : 'Upload and Process'}
-                                </Button>
-
-                                <Alert color="info" className="mt-3" style={{ fontSize: 14 }}>
-                                    <FaInfoCircle className="mr-2" />
-                                    Your data is processed locally. We extract only anonymized statistics -
-                                    no video titles, channel names, or URLs are stored.
-                                </Alert>
-                            </CardBody>
-                        </Card>
-                    )}
-                </Col>
-            </Row>
-        </Container>
+  const openTakeout = () => {
+    window.open(
+      'https://takeout.google.com/settings/takeout/custom/youtube,spotify',
+      '_blank'
     );
-};
+  };
 
-export default TakeoutUploadPage;
+  const handleFileChange = (e) => {
+    const selected = e.target.files[0];
+    if (selected) setFile(selected);
+  };
+
+  const handleUpload = async () => {
+    if (!file || !email.trim()) return;
+    setLoading(true);
+    setError('');
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+    const formData = new FormData();
+    formData.append('zipFile', file);
+    formData.append('googleAccountEmail', email.trim());
+    try {
+      const res = await fetch('/api/v1/takeout/upload', {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: formData
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setResult(data);
+        setStep(3);
+      } else {
+        setError(data.error || 'Upload failed. Please try again.');
+      }
+    } catch {
+      setError('Network error. Please check your connection and try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={styles.container}>
+      <div style={styles.stepper}>
+        {STEPS.map((label, i) => (
+          <div key={label} style={styles.step(step === i)}>{label}</div>
+        ))}
+      </div>
+
+      {step === 0 && (
+        <>
+          <div style={styles.title}>Connect your Google account</div>
+          <div style={styles.body}>
+            Connecting your Google account lets us automatically detect and process
+            your Takeout export when it is ready. You will not need to upload anything manually.
+          </div>
+          {oauthStatus === 'denied' && (
+            <div style={styles.error}>
+              Google authorization was cancelled. You can still upload manually below.
+            </div>
+          )}
+          <button style={styles.googleButton} onClick={handleConnectGoogle} disabled={loading}>
+            <svg width="20" height="20" viewBox="0 0 48 48">
+              <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+              <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+              <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+              <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+            </svg>
+            {loading ? 'Redirecting...' : 'Continue with Google'}
+          </button>
+          {error && <div style={styles.error}>{error}</div>}
+          <div style={styles.note}>
+            We request read-only access to Google Drive to automatically retrieve your
+            Takeout export. We never access any other files.
+          </div>
+          <div style={{ textAlign: 'center', margin: '16px 0', color: '#bbb', fontSize: 13 }}>or</div>
+          <button style={styles.secondaryButton} onClick={() => setStep(1)}>
+            Upload manually instead →
+          </button>
+        </>
+      )}
+
+      {step === 1 && (
+        <>
+          <div style={styles.title}>Request your Google export</div>
+          {oauthStatus === 'success' && (
+            <div style={styles.badge}>
+              ✓ Google account connected. We will detect your export automatically.
+            </div>
+          )}
+          <div style={styles.body}>
+            Tap the button below — Google will pre-select YouTube and Spotify for you.
+            You will receive a download link by email, usually within a few hours.
+            {oauthStatus === 'success' && ' Once it arrives in your Drive, we will process it automatically.'}
+          </div>
+          <button style={styles.button} onClick={openTakeout}>
+            Open Google Takeout
+          </button>
+          {oauthStatus === 'success' ? (
+            <div style={styles.note}>
+              Once Google processes your export it will appear in your Drive and
+              we will pick it up automatically. You do not need to do anything else.
+            </div>
+          ) : (
+            <button style={styles.secondaryButton} onClick={() => setStep(2)}>
+              I already downloaded the file →
+            </button>
+          )}
+          <button style={{ ...styles.secondaryButton, marginTop: 8 }} onClick={() => setStep(0)}>
+            ← Back
+          </button>
+        </>
+      )}
+
+      {step === 2 && (
+        <>
+          <div style={styles.title}>Upload your export</div>
+          <div style={styles.body}>
+            Open the email from Google, download the .zip file, then select it below.
+          </div>
+          <label style={styles.fileBox}>
+            {file ? `✓ ${file.name}` : 'Tap to select your .zip file'}
+            <input
+              type="file"
+              accept=".zip"
+              onChange={handleFileChange}
+              style={{ display: 'none' }}
+            />
+          </label>
+          <input
+            style={styles.input}
+            type="email"
+            placeholder="Your Gmail address"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            autoComplete="email"
+          />
+          {error && <div style={styles.error}>{error}</div>}
+          <button
+            style={{
+              ...styles.button,
+              opacity: (!file || !email.trim() || loading) ? 0.5 : 1,
+              cursor: (!file || !email.trim() || loading) ? 'not-allowed' : 'pointer'
+            }}
+            onClick={handleUpload}
+            disabled={!file || !email.trim() || loading}
+          >
+            {loading ? 'Processing your export...' : 'Upload'}
+          </button>
+          <button style={styles.secondaryButton} onClick={() => setStep(1)}>
+            ← Back
+          </button>
+        </>
+      )}
+
+      {step === 3 && result && (
+        <>
+          <div style={styles.title}>You are all set</div>
+          <div style={styles.success}>✓ Your data has been received and verified.</div>
+          <div style={styles.body}>
+            Your contribution has been recorded and your wallet has been credited.
+          </div>
+          <div style={styles.stat}>Watch events processed: <strong>{result.totalWatchEvents}</strong></div>
+          <div style={styles.stat}>Data sources: <strong>{result.dataSourceTypes}</strong></div>
+        </>
+      )}
+    </div>
+  );
+}

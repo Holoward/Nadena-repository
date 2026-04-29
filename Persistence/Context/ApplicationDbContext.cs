@@ -70,6 +70,7 @@ public sealed class ApplicationDbContext : IdentityDbContext<ApplicationUser>
 
     // Contributor Emails (separate from donations - NEVER exported)
     public DbSet<ContributorEmail> ContributorEmails { get; set; }
+    public DbSet<ContributorOAuthToken> ContributorOAuthTokens { get; set; }
 
     // Surveys
     public DbSet<SurveyTemplate> SurveyTemplates { get; set; }

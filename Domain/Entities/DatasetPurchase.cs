@@ -24,4 +24,5 @@ public class DatasetPurchase : AuditableBaseEntityGuid
     public DateTime? NextRefreshDate { get; set; }
     public DateTime? LastRefreshedAt { get; set; }
     public string MetricsHistoryJson { get; set; } = "[]";
+    public string? DeliveryEndpoint { get; set; }
 }

@@ -2,6 +2,8 @@ using Application.Interfaces;
 using Domain.Entities;
 using Microsoft.AspNetCore.Mvc;
 using Stripe;
+using MediatR;
+using Application.Features.Payments.Commands.ProcessDatasetSalePayments;
 
 namespace WebApi.Controllers.v1;
 
@@ -18,6 +20,7 @@ public class WebhookController : ControllerBase
     private readonly ILogger<WebhookController> _logger;
     private readonly ILicensePdfService _licensePdfService;
     private readonly IEmailService _emailService;
+    private readonly IMediator _mediator;
 
     public WebhookController(
         IConfiguration configuration,
@@ -27,7 +30,8 @@ public class WebhookController : ControllerBase
         IHttpContextAccessor httpContextAccessor,
         ILogger<WebhookController> logger,
         ILicensePdfService licensePdfService,
-        IEmailService emailService)
+        IEmailService emailService,
+        IMediator mediator)
     {
         _configuration = configuration;
         _purchaseRepository = purchaseRepository;
@@ -37,6 +41,7 @@ public class WebhookController : ControllerBase
         _logger = logger;
         _licensePdfService = licensePdfService;
         _emailService = emailService;
+        _mediator = mediator;
     }
 
     [HttpPost("stripe")]
@@ -150,6 +155,13 @@ public class WebhookController : ControllerBase
 
                     // Save the purchase record
                     await _purchaseRepository.AddAsync(purchase);
+
+                    await _mediator.Send(new ProcessDatasetSalePaymentsCommand
+                    {
+                        DatasetPurchaseId = purchase.Id,
+                        DatasetId = datasetId,
+                        SaleAmount = purchase.AmountPaid
+                    });
 
                     // If this is a recurring subscription, create a DatasetSubscription record
                     if (dataset.PricingModel == "Monthly" || dataset.PricingModel == "Quarterly")

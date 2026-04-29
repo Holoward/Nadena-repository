@@ -11,7 +11,7 @@ public class CreateDataPoolCommand : IRequest<ServiceResponse<CreateDataPoolResu
     public string Description { get; set; } = string.Empty;
     public string Category { get; set; } = string.Empty;
     public decimal PricePerMonth { get; set; }
-    public decimal RevenueSharePercent { get; set; } = 75m;
+    public decimal RevenueSharePercent { get; set; } = 40m;
 }
 
 public class CreateDataPoolResult
@@ -40,7 +40,7 @@ public class CreateDataPoolCommandHandler : IRequestHandler<CreateDataPoolComman
             Description = request.Description,
             Category = request.Category,
             PricePerMonth = request.PricePerMonth,
-            RevenueSharePercent = Math.Clamp(request.RevenueSharePercent, 50m, 90m),
+            RevenueSharePercent = Math.Clamp(request.RevenueSharePercent, 10m, 90m),
             IsActive = true
         };
 

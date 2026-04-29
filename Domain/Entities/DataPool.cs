@@ -17,8 +17,8 @@ public class DataPool : AuditableBaseEntity
     /// <summary>Monthly licensing price in USD</summary>
     public decimal PricePerMonth { get; set; }
 
-    /// <summary>Percentage of revenue that goes to volunteers (70-80). Platform keeps the rest.</summary>
-    public decimal RevenueSharePercent { get; set; } = 75m;
+    /// <summary>Percentage of revenue that goes to contributors (default 40).</summary>
+    public decimal RevenueSharePercent { get; set; } = 40m;
 
     public bool IsActive { get; set; } = true;
 

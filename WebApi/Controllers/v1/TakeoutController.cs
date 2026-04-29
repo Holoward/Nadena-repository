@@ -1,0 +1,143 @@
+using Application.Interfaces;
+using Domain.Entities;
+using Domain.Enums;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
+
+namespace WebApi.Controllers.v1;
+
+[ApiVersion("1.0")]
+[ApiController]
+[Route("api/v{version:apiVersion}/[controller]")]
+[Authorize(Roles = "Data Contributor")]
+public class TakeoutController : ControllerBase
+{
+    private readonly ITakeoutValidationService _validationService;
+    private readonly IDataDeliveryService _deliveryService;
+    private readonly IVolunteerRepository _volunteerRepository;
+    private readonly IRepositoryAsync<DatasetPurchase> _purchaseRepository;
+    private readonly IWalletRepository _walletRepository;
+    private readonly ICurrentUserService _currentUserService;
+    private readonly ILogger<TakeoutController> _logger;
+
+    public TakeoutController(
+        ITakeoutValidationService validationService,
+        IDataDeliveryService deliveryService,
+        IVolunteerRepository volunteerRepository,
+        IRepositoryAsync<DatasetPurchase> purchaseRepository,
+        IWalletRepository walletRepository,
+        ICurrentUserService currentUserService,
+        ILogger<TakeoutController> logger)
+    {
+        _validationService = validationService;
+        _deliveryService = deliveryService;
+        _volunteerRepository = volunteerRepository;
+        _purchaseRepository = purchaseRepository;
+        _walletRepository = walletRepository;
+        _currentUserService = currentUserService;
+        _logger = logger;
+    }
+
+    [HttpPost("upload")]
+    [EnableRateLimiting("upload")]
+    [RequestSizeLimit(524_288_000)]
+    [Consumes("multipart/form-data")]
+    public async Task<IActionResult> Upload(
+        [FromForm] IFormFile zipFile,
+        [FromForm] string googleAccountEmail)
+    {
+        if (zipFile == null || zipFile.Length == 0)
+            return BadRequest(new { error = "No file uploaded." });
+
+        if (string.IsNullOrWhiteSpace(googleAccountEmail))
+            return BadRequest(new { error = "Google account email is required." });
+
+        var userId = _currentUserService.GetCurrentUserId();
+        if (string.IsNullOrWhiteSpace(userId))
+            return Unauthorized();
+
+        var volunteer = await _volunteerRepository.GetByUserIdAsync(userId);
+        if (volunteer == null)
+            return NotFound(new { error = "Contributor record not found." });
+
+        if (!string.IsNullOrWhiteSpace(volunteer.DataIntegrityHash)
+            && volunteer.IntegrityStatus == IntegrityStatus.Verified)
+        {
+            return Conflict(new { error = "You have already submitted a verified export. Only one submission is accepted per account." });
+        }
+
+        volunteer.UploadAttempts += 1;
+        volunteer.LastUploadAttempt = DateTime.UtcNow;
+        await _volunteerRepository.UpdateAsync(volunteer);
+
+        // Pass stream, not IFormFile, to keep the service layer ASP.NET-free
+        using var stream = zipFile.OpenReadStream();
+        var result = await _validationService.ValidateAndExtractAsync(stream, googleAccountEmail);
+
+        if (!result.IsValid)
+        {
+            volunteer.IntegrityStatus = IntegrityStatus.Flagged;
+            volunteer.IntegrityReason = result.FailureReason;
+            await _volunteerRepository.UpdateAsync(volunteer);
+            return UnprocessableEntity(new { error = result.FailureReason });
+        }
+
+        volunteer.DataIntegrityHash = result.GoogleAccountIdHash;
+        volunteer.IntegrityStatus = IntegrityStatus.Verified;
+        volunteer.IntegrityReason = "Passed all validation checks";
+        volunteer.HasDonated = true;
+        volunteer.ActivatedDate = DateTime.UtcNow;
+        await _volunteerRepository.UpdateAsync(volunteer);
+
+        var allPurchases = await _purchaseRepository.ListAsync();
+        var activePurchases = allPurchases
+            .Where(p => p.Status == "Processing"
+                     && !string.IsNullOrWhiteSpace(p.DeliveryEndpoint))
+            .ToList();
+
+        foreach (var purchase in activePurchases)
+        {
+            var delivery = await _deliveryService.ForwardAsync(
+                result.Payload!,
+                purchase.DeliveryEndpoint!,
+                purchase.Id);
+
+            if (delivery.Success)
+                _logger.LogInformation("Delivered to purchase {PurchaseId}", purchase.Id);
+            else
+                _logger.LogWarning("Delivery failed for purchase {PurchaseId}: {Error}", purchase.Id, delivery.ErrorMessage);
+        }
+
+        var wallet = await _walletRepository.GetByOwnerAsync(userId);
+        if (wallet == null)
+        {
+            wallet = new Wallet
+            {
+                Id = Guid.NewGuid(),
+                OwnerType = "User",
+                OwnerId = userId,
+                Balance = 0m,
+                PendingBalance = 0.10m,
+                Currency = "USD",
+                LastUpdated = DateTime.UtcNow,
+                Created = DateTime.UtcNow,
+                CreatedBy = "System"
+            };
+            await _walletRepository.AddAsync(wallet);
+        }
+        else
+        {
+            wallet.PendingBalance += 0.10m;
+            wallet.LastUpdated = DateTime.UtcNow;
+            await _walletRepository.UpdateAsync(wallet);
+        }
+
+        return Ok(new
+        {
+            message = "Export received and verified. Your wallet has been credited.",
+            totalWatchEvents = result.Payload!.TotalWatchEvents,
+            dataSourceTypes = result.Payload.DataSourceTypes
+        });
+    }
+}
