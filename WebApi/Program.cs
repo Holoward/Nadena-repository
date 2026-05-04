@@ -261,43 +261,24 @@ static async Task SeedIdentityDataAsync(IServiceProvider services, IConfiguratio
 
 static async Task SeedMarketplaceDataAsync(ApplicationDbContext dbContext)
 {
+    // Update DataPool record counts based on WatchEvents
+    // YoutubeComment seeding removed — data now arrives via Google Takeout uploads
     var activePools = await dbContext.DataPools
         .Where(pool => pool.IsActive)
         .OrderBy(pool => pool.Id)
         .ToListAsync();
 
     if (!activePools.Any())
-    {
         return;
-    }
 
-    if (!await dbContext.YoutubeComments.AnyAsync())
-    {
-        var sampleComments = Enumerable.Range(1, 12)
-            .Select(index => new YoutubeComment
-            {
-                VolunteerId = index,
-                CommentText = $"Sample anonymized YouTube comment #{index}",
-                VideoId = $"video-{index}",
-                Timestamp = DateTime.UtcNow.AddDays(-index),
-                LikeCount = index * 2,
-                IsAnonymized = true,
-                AnonymizationMethod = "anon-id"
-            })
-            .ToList();
+    var watchEventCount = await dbContext.WatchEvents.LongCountAsync();
 
-        await dbContext.YoutubeComments.AddRangeAsync(sampleComments);
-    }
-
-    var commentCount = await dbContext.YoutubeComments.CountAsync();
     foreach (var pool in activePools)
     {
         if (string.IsNullOrWhiteSpace(pool.SourceTable))
-        {
-            pool.SourceTable = "YoutubeComments";
-        }
+            pool.SourceTable = "WatchEvents";
 
-        pool.ApproximateRecordCount = Math.Max(pool.ApproximateRecordCount, commentCount);
+        pool.ApproximateRecordCount = Math.Max(pool.ApproximateRecordCount, watchEventCount);
     }
 
     await dbContext.SaveChangesAsync();

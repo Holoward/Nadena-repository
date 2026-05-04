@@ -11,6 +11,9 @@ namespace WebApi.Controllers.v1;
 [ApiController]
 [Route("api/v{version:apiVersion}/[controller]")]
 [Authorize(Roles = "Data Contributor")]
+/// <summary>
+/// Handles contributor data submission. Accepts Google Takeout ZIP uploads, validates them, forwards anonymized payload to buyer endpoints, and credits the contributor wallet.
+/// </summary>
 public class TakeoutController : ControllerBase
 {
     private readonly ITakeoutValidationService _validationService;
@@ -21,6 +24,9 @@ public class TakeoutController : ControllerBase
     private readonly ICurrentUserService _currentUserService;
     private readonly ILogger<TakeoutController> _logger;
 
+    /// <summary>
+    /// Creates the controller with validation, delivery, repository, wallet, user, and logging services.
+    /// </summary>
     public TakeoutController(
         ITakeoutValidationService validationService,
         IDataDeliveryService deliveryService,
@@ -43,6 +49,9 @@ public class TakeoutController : ControllerBase
     [EnableRateLimiting("upload")]
     [RequestSizeLimit(524_288_000)]
     [Consumes("multipart/form-data")]
+    /// <summary>
+    /// Accepts a contributor's Takeout ZIP, validates it, delivers anonymized data to active buyers, and credits the contributor wallet.
+    /// </summary>
     public async Task<IActionResult> Upload(
         [FromForm] IFormFile zipFile,
         [FromForm] string googleAccountEmail)

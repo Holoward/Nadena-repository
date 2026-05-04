@@ -1,7 +1,5 @@
 using System.Text.Json;
 using Application.Common;
-using Application.Features.Datasets.Commands.AnalyzeDataset;
-using Application.Features.Datasets.Commands.BuildDataset;
 using Application.Features.Datasets.Commands.CreateDataset;
 using Application.Features.Datasets.Commands.UpdateDataset;
 using Application.Features.Datasets.DTOs;
@@ -90,14 +88,6 @@ public class DatasetController : ControllerBase
         return Ok(await _mediator.Send(command));
     }
 
-    // POST: api/v1/Dataset/build
-    [HttpPost("build")]
-    [Authorize(Roles = "Admin")]
-    public async Task<IActionResult> Build(BuildDatasetCommand command)
-    {
-        return Ok(await _mediator.Send(command));
-    }
-
     // GET: api/v1/Dataset/{id}/download?token={token}
     [HttpGet("{id}/download")]
     [Authorize(Roles = "Data Client,Admin")]
@@ -159,13 +149,7 @@ public class DatasetController : ControllerBase
         return File(fileStream, "text/csv", $"{id}.csv");
     }
 
-    // POST: api/v1/Dataset/{id}/analyze
-    [HttpPost("{id}/analyze")]
-    [Authorize(Roles = "Admin")]
-    public async Task<IActionResult> Analyze(int id)
-    {
-        return Ok(await _mediator.Send(new AnalyzeDatasetCommand { DatasetId = id }));
-    }
+
 
     // GET: api/v1/Dataset/{id}/analysis
     [HttpGet("{id}/analysis")]

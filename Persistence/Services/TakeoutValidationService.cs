@@ -6,8 +6,14 @@ using Application.Interfaces;
 
 namespace Persistence.Services;
 
+/// <summary>
+/// Validates Google Takeout ZIP files submitted by contributors. Checks structure, schema, timestamp plausibility, and hashes the contributor's Google account ID for deduplication.
+/// </summary>
 public class TakeoutValidationService : ITakeoutValidationService
 {
+    /// <summary>
+    /// Validates a Takeout ZIP stream and extracts an anonymized summary payload when the file is acceptable.
+    /// </summary>
     public async Task<TakeoutValidationResult> ValidateAndExtractAsync(
         Stream zipStream,
         string contributorGoogleAccountEmail)
@@ -127,6 +133,9 @@ public class TakeoutValidationService : ITakeoutValidationService
         }
     }
 
+    /// <summary>
+    /// Creates a failed validation result with the supplied reason.
+    /// </summary>
     private static TakeoutValidationResult Fail(string reason) =>
         new() { IsValid = false, FailureReason = reason };
 }

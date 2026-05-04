@@ -19,6 +19,7 @@ import VerifyEmail from './pages/VerifyEmail';
 import TakeoutUpload from './pages/TakeoutUpload';
 import ContributorStats from './pages/ContributorStats';
 import Marketplace from './pages/Marketplace';
+import FlowDiagram from './pages/FlowDiagram';
 
 import './custom.css'
 
@@ -78,6 +79,7 @@ function App() {
         <ProtectedRoute path="/stats" component={ContributorStats} allowedRole="Data Contributor" />
 
         {/* Catch all - redirect to home */}
+        <Route path="/flow" component={FlowDiagram} />
         <Route path="*" component={Landing} />
       </Switch>
     </AuthProvider>

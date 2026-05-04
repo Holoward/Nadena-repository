@@ -1,5 +1,8 @@
 namespace Application.Interfaces;
 
+/// <summary>
+/// Represents the outcome of validating and extracting a contributor's Takeout ZIP file.
+/// </summary>
 public class TakeoutValidationResult
 {
     public bool IsValid { get; set; }
@@ -8,6 +11,9 @@ public class TakeoutValidationResult
     public AnonymizedTakeoutPayload? Payload { get; set; }
 }
 
+/// <summary>
+/// Represents the anonymized, aggregate data extracted from a contributor's Takeout export.
+/// </summary>
 public class AnonymizedTakeoutPayload
 {
     public int TotalWatchEvents { get; set; }
@@ -20,7 +26,13 @@ public class AnonymizedTakeoutPayload
     public string DataSourceTypes { get; set; } = string.Empty;
 }
 
+/// <summary>
+/// Defines validation and extraction behavior for Google Takeout ZIP submissions.
+/// </summary>
 public interface ITakeoutValidationService
 {
+    /// <summary>
+    /// Validates a Takeout ZIP stream and returns an anonymized payload when validation succeeds.
+    /// </summary>
     Task<TakeoutValidationResult> ValidateAndExtractAsync(Stream zipStream, string contributorGoogleAccountEmail);
 }

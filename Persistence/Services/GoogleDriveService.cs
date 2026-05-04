@@ -6,17 +6,26 @@ using Microsoft.Extensions.Configuration;
 
 namespace Persistence.Services;
 
+/// <summary>
+/// Handles all Google Drive API interactions. Refreshes access tokens, searches for Takeout ZIP files, and downloads them as streams for processing.
+/// </summary>
 public class GoogleDriveService : IGoogleDriveService
 {
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IConfiguration _configuration;
 
+    /// <summary>
+    /// Creates the service with HTTP and configuration dependencies for Google API calls.
+    /// </summary>
     public GoogleDriveService(IHttpClientFactory httpClientFactory, IConfiguration configuration)
     {
         _httpClientFactory = httpClientFactory;
         _configuration = configuration;
     }
 
+    /// <summary>
+    /// Uses an encrypted refresh token to request a fresh Google Drive access token.
+    /// </summary>
     public async Task<string> RefreshAccessTokenAsync(string encryptedRefreshToken)
     {
         var encryptionKey = _configuration["NadenaSettings:TokenEncryptionKey"];
@@ -47,6 +56,9 @@ public class GoogleDriveService : IGoogleDriveService
             ?? throw new Exception("No access_token in refresh response");
     }
 
+    /// <summary>
+    /// Searches Google Drive for Takeout ZIP files created after the supplied timestamp.
+    /// </summary>
     public async Task<List<DriveFile>> FindTakeoutFilesAsync(string accessToken, DateTime newerThan)
     {
         var client = _httpClientFactory.CreateClient();
@@ -88,6 +100,9 @@ public class GoogleDriveService : IGoogleDriveService
         return files;
     }
 
+    /// <summary>
+    /// Downloads a Google Drive file into a seekable stream.
+    /// </summary>
     public async Task<Stream> DownloadFileAsync(string accessToken, string fileId)
     {
         var client = _httpClientFactory.CreateClient();
@@ -106,6 +121,9 @@ public class GoogleDriveService : IGoogleDriveService
         return ms;
     }
 
+    /// <summary>
+    /// Encrypts a token with the configured symmetric key for storage.
+    /// </summary>
     public static string Encrypt(string plainText, string base64Key)
     {
         var keyBytes = Convert.FromBase64String(base64Key);
@@ -121,6 +139,9 @@ public class GoogleDriveService : IGoogleDriveService
         return Convert.ToBase64String(result);
     }
 
+    /// <summary>
+    /// Decrypts a stored token with the configured symmetric key.
+    /// </summary>
     public static string Decrypt(string cipherText, string base64Key)
     {
         var fullBytes = Convert.FromBase64String(cipherText);

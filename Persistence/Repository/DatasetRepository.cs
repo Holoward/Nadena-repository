@@ -36,20 +36,6 @@ public class DatasetRepository : MyRepositoryAsync<Dataset>, IDatasetRepository
         await DbContext.SaveChangesAsync();
     }
 
-    public async Task<List<YoutubeComment>> GetAnonymizedCommentsByVolunteerIds(List<Guid> volunteerIds)
-    {
-        var volunteerIdStrings = volunteerIds.Select(g => g.ToString()).ToList();
-        
-        var volunteers = await DbContext.Volunteers
-            .Where(v => volunteerIdStrings.Contains(v.UserId))
-            .Select(v => v.Id)
-            .ToListAsync();
-
-        return await DbContext.YoutubeComments
-            .Where(c => volunteers.Contains(c.VolunteerId) && c.IsAnonymized)
-            .ToListAsync();
-    }
-
     public async Task<IEnumerable<Dataset>> GetFlaggedAsync()
     {
         return await DbContext.Datasets

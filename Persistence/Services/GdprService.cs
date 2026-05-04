@@ -40,11 +40,6 @@ public class GdprService : IGdprService
             throw new InvalidOperationException("User not found");
         }
 
-        // Get all YoutubeComment records
-        var youtubeComments = await _context.YoutubeComments
-            .Where(c => c.VolunteerId == volunteerId)
-            .ToListAsync(cancellationToken);
-
         // Get all ConsentRecord records
         var consentRecords = await _context.ConsentRecords
             .Where(c => c.UserId == userId)
@@ -55,18 +50,6 @@ public class GdprService : IGdprService
             .Where(p => p.VolunteerId == volunteerId)
             .ToListAsync(cancellationToken);
 
-        // Get upload history (inferred from comment timestamps)
-        var uploadHistory = youtubeComments
-            .GroupBy(c => new { c.Timestamp.Year, c.Timestamp.Month })
-            .Select(g => new UploadHistoryExportDto
-            {
-                UploadedAt = new DateTime(g.Key.Year, g.Key.Month, 1),
-                CommentCount = g.Count(),
-                FileName = $"Comments_{g.Key.Year}_{g.Key.Month:D2}"
-            })
-            .OrderByDescending(u => u.UploadedAt)
-            .ToList();
-
         // Build the export DTO
         return new VolunteerDataExportDto
         {
@@ -76,13 +59,7 @@ public class GdprService : IGdprService
             PayPalEmail = volunteer.PayPalEmail,
             Status = volunteer.Status.ToString(),
             CreatedAt = volunteer.Created,
-            YoutubeComments = youtubeComments.Select(c => new YoutubeCommentExportDto
-            {
-                VideoId = c.VideoId,
-                VideoTitle = string.Empty,
-                CommentText = c.CommentText,
-                CommentDate = c.Timestamp
-            }).ToList(),
+            YoutubeComments = new List<YoutubeCommentExportDto>(),
             ConsentRecords = consentRecords.Select(c => new ConsentRecordExportDto
             {
                 ConsentType = c.ConsentText,
@@ -97,7 +74,7 @@ public class GdprService : IGdprService
                 PaidAt = p.PaidAt ?? DateTime.MinValue,
                 TransactionId = p.PayPalPayoutItemId
             }).ToList(),
-            UploadHistory = uploadHistory
+            UploadHistory = new List<UploadHistoryExportDto>()
         };
     }
 
@@ -109,12 +86,6 @@ public class GdprService : IGdprService
         {
             throw new UnauthorizedAccessException("You can only delete your own data");
         }
-
-        // Delete all YoutubeComment records
-        var youtubeComments = await _context.YoutubeComments
-            .Where(c => c.VolunteerId == volunteerId)
-            .ToListAsync(cancellationToken);
-        _context.YoutubeComments.RemoveRange(youtubeComments);
 
         // Delete all SpotifyListeningRecord records
         var spotifyRecords = await _context.SpotifyListeningRecords
@@ -132,7 +103,7 @@ public class GdprService : IGdprService
             entityId: volunteerId.ToString(),
             success: true,
             userId: userId,
-            newValues: $"{{\"Status\":\"{VolunteerStatus.Deleted}\",\"DeletedCommentsCount\":{youtubeComments.Count},\"DeletedSpotifyRecordsCount\":{spotifyRecords.Count}}}");
+            newValues: $"{{\"Status\":\"{VolunteerStatus.Deleted}\",\"DeletedSpotifyRecordsCount\":{spotifyRecords.Count}}}");
 
         await _context.SaveChangesAsync(cancellationToken);
 

@@ -9,6 +9,9 @@ namespace WebApi.Controllers.v1;
 [ApiVersion("1.0")]
 [ApiController]
 [Route("api/v{version:apiVersion}/[controller]")]
+/// <summary>
+/// Manages Google OAuth authorization for contributors. Generates the authorization URL and handles the callback to store encrypted refresh tokens.
+/// </summary>
 public class OAuthController : ControllerBase
 {
     private readonly IConfiguration _configuration;
@@ -17,6 +20,9 @@ public class OAuthController : ControllerBase
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<OAuthController> _logger;
 
+    /// <summary>
+    /// Creates the controller with configuration, token storage, current-user, HTTP, and logging services.
+    /// </summary>
     public OAuthController(
         IConfiguration configuration,
         IContributorOAuthTokenRepository tokenRepository,
@@ -33,6 +39,9 @@ public class OAuthController : ControllerBase
 
     [HttpGet("google-url")]
     [Authorize(Roles = "Data Contributor")]
+    /// <summary>
+    /// Builds the Google OAuth authorization URL for the signed-in contributor.
+    /// </summary>
     public IActionResult GetGoogleOAuthUrl()
     {
         var clientId = _configuration["NadenaSettings:GoogleClientId"];
@@ -56,6 +65,9 @@ public class OAuthController : ControllerBase
     }
 
     [HttpGet("callback")]
+    /// <summary>
+    /// Handles Google's OAuth callback, exchanges the code for tokens, and stores the contributor's encrypted refresh token.
+    /// </summary>
     public async Task<IActionResult> GoogleCallback(
         [FromQuery] string code,
         [FromQuery] string state,

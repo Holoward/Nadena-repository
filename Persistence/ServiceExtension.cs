@@ -28,12 +28,10 @@ public static class ServiceExtension
         services.AddScoped<IWalletRepository, WalletRepository>();
         services.AddScoped<ITransactionRepository, LedgerTransactionRepository>();
         services.AddScoped<IConsentRecordRepository, ConsentRecordRepository>();
-        services.AddScoped<IYoutubeCommentRepository, YoutubeCommentRepository>();
         services.AddScoped<ISpotifyRecordRepository, SpotifyRecordRepository>();
         services.AddScoped<INetflixRecordRepository, NetflixRecordRepository>();
         services.AddScoped<IWatchEventRepository, WatchEventRepository>();
         services.AddScoped<IAuthService, AuthService>();
-        services.AddScoped<IFileStorageService, FileStorageService>();
         services.AddScoped<IVolunteerPaymentRepository, VolunteerPaymentRepository>();
         services.AddScoped<IPaymentService, PaymentService>();
 
@@ -41,7 +39,6 @@ public static class ServiceExtension
         services.AddScoped<IDataPoolRepository, DataPoolRepository>();
         services.AddScoped<IDataLicenseRepository, DataLicenseRepository>();
         services.AddScoped<IApiKeyService, ApiKeyService>();
-        services.AddScoped<IBlockchainService, LocalBlockchainService>();
 
         // Audit Logging
         services.AddScoped<IAuditLogService, AuditLogService>();
@@ -56,14 +53,10 @@ public static class ServiceExtension
         // Deduplication Service
         services.AddScoped<IDeduplicationService, DeduplicationService>();
 
-        // Groq AI Analysis Service
-        services.AddScoped<IGroqAnalysisService, GroqAnalysisService>();
+
 
         // License PDF Service
         services.AddScoped<ILicensePdfService, LicensePdfService>();
-
-        // Reviews
-        services.AddScoped<IReviewRepository, ReviewRepository>();
 
         // Subscriptions
         services.AddScoped<IDatasetSubscriptionRepository, DatasetSubscriptionRepository>();

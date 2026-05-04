@@ -6,7 +6,6 @@ public class DatasetDto
     public string Title { get; set; }
     public string Description { get; set; }
     public int VolunteerCount { get; set; }
-    public int CommentCount { get; set; }
     public decimal Price { get; set; }
     public string Status { get; set; }
     public string BuyerReference { get; set; }
@@ -21,10 +20,6 @@ public class DatasetDto
     public string? IntendedUseCases { get; set; }
     public string DataFormat { get; set; }
     public string? SchemaDescription { get; set; }
-
-    // Review aggregates
-    public double AverageRating { get; set; }
-    public int ReviewCount { get; set; }
 
     // Provenance
     public string? ProvenanceDownloadUrl { get; set; }

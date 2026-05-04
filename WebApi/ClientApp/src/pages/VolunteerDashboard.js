@@ -1,9 +1,9 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Container, Row, Col, Card, CardBody, CardTitle, CardText, Button, FormGroup, Input, Alert, Badge } from 'reactstrap';
+import React, { useEffect, useState } from 'react';
+import { Container, Card, CardBody, CardTitle, CardText, Button, Alert, Input } from 'reactstrap';
 import { useAuth } from '../context/AuthContext';
 
 const VolunteerDashboard = () => {
-  const { auth, logout } = useAuth();
+  const { auth } = useAuth();
   const [profile, setProfile] = useState(null);
   const [settings, setSettings] = useState({
     YouTube: { enabled: true, sharingPreference: 'ShareNow' },
@@ -18,12 +18,6 @@ const VolunteerDashboard = () => {
   const [error, setError] = useState(null);
 
   const firstName = auth.user?.given_name || auth.user?.firstName || 'Data Contributor';
-
-  const dataSourceCards = useMemo(() => ([
-    { key: 'YouTube', color: '#FF0000', connectLabel: 'Connect via Google API' },
-    { key: 'Spotify', color: '#1DB954', connectLabel: 'Connect via Spotify API' },
-    { key: 'Netflix', color: '#E50914', connectLabel: 'Connect via Netflix API' }
-  ]), []);
 
   const parseSettingsFromNotes = (notes) => {
     if (!notes) return null;
@@ -130,119 +124,21 @@ const VolunteerDashboard = () => {
   };
 
   if (loading) {
-    return (
-      <div style={{ padding: 40, textAlign: 'center' }}>
-        <div className="spinner-border text-primary" role="status">
-          <span className="visually-hidden">Loading...</span>
-        </div>
-        <p className="mt-3">Loading your dashboard...</p>
-      </div>
-    );
+    return <div style={{padding:40}}>Loading...</div>;
   }
 
   return (
     <div>
-      <div style={{ backgroundColor: '#1a2f4a', padding: '26px 0', color: 'white', marginBottom: '26px' }}>
-        <Container>
-          <Row className="align-items-center">
-            <Col md="8">
-              <h2 style={{ margin: 0 }}>Welcome, {firstName}!</h2>
-              <p style={{ margin: '10px 0 0', opacity: 0.9 }}>Data Contributor Dashboard</p>
-            </Col>
-            <Col md="4" className="text-md-end">
-              <Button color="light" onClick={logout} style={{ color: '#1a2f4a' }}>Logout</Button>
-            </Col>
-          </Row>
-        </Container>
-      </div>
+      <h2>Welcome, {firstName}</h2>
 
       <Container>
         {account && !account.emailConfirmed && <Alert color="warning">Please verify your email to unlock all features.</Alert>}
         {error && <Alert color="danger">{error}</Alert>}
 
-        <Card style={{ borderColor: '#1a2f4a', borderWidth: 2, marginBottom: 22 }}>
-          <CardBody>
-            <div className="d-flex justify-content-between align-items-center">
-              <CardTitle tag="h4" style={{ color: '#1a2f4a', marginBottom: 0 }}>Data Sources</CardTitle>
-              <Button color="primary" disabled={saving} onClick={saveDataSources} style={{ backgroundColor: '#1a2f4a', borderColor: '#1a2f4a' }}>
-                {saving ? 'Saving...' : 'Save'}
-              </Button>
-            </div>
-            <CardText className="mt-2" style={{ color: '#555' }}>
-              Toggle what you want to share. You’ll always be notified based on your sharing preference.
-            </CardText>
+        <p><a href="/upload" style={{color:'#6c47ff'}}>Submit your Google Takeout export →</a></p>
 
-            <Row className="mt-3">
-              {dataSourceCards.map((card) => {
-                const st = settings[card.key];
-                const connected = false;
-                return (
-                  <Col md="4" key={card.key} className="mb-3">
-                    <Card style={{ borderRadius: 12, border: `2px solid ${st.enabled ? card.color : '#e9ecef'}` }}>
-                      <CardBody>
-                        <div className="d-flex justify-content-between align-items-center">
-                          <div>
-                            <h5 style={{ margin: 0 }}>{card.key}</h5>
-                            <small style={{ color: '#666' }}>
-                              Status: {connected ? <Badge color="success">Connected</Badge> : <Badge color="secondary">Not connected</Badge>}
-                            </small>
-                          </div>
-                          <FormGroup check style={{ margin: 0 }}>
-                            <label style={{ display: 'flex', alignItems: 'center', gap: 8, margin: 0 }}>
-                              <Input type="checkbox" checked={!!st.enabled} onChange={() => handleToggle(card.key)} />
-                              <span>Share</span>
-                            </label>
-                          </FormGroup>
-                        </div>
-
-                        {st.enabled && (
-                          <div className="mt-3">
-                            <Button color="outline-dark" block onClick={() => connectComingSoon(card.key)}>
-                              {card.connectLabel} (Coming Soon)
-                            </Button>
-
-                            <div className="mt-3">
-                              <div style={{ fontWeight: 600, marginBottom: 6 }}>Sharing preference</div>
-                              <FormGroup check>
-                                <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                                  <Input
-                                    type="radio"
-                                    name={`${card.key}-pref`}
-                                    checked={st.sharingPreference === 'ShareNow'}
-                                    onChange={() => handlePreference(card.key, 'ShareNow')}
-                                  />
-                                  <span>Share now and get notified when payment is processed</span>
-                                </label>
-                              </FormGroup>
-                              <FormGroup check className="mt-1">
-                                <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                                  <Input
-                                    type="radio"
-                                    name={`${card.key}-pref`}
-                                    checked={st.sharingPreference === 'WaitForRequest'}
-                                    onChange={() => handlePreference(card.key, 'WaitForRequest')}
-                                  />
-                                  <span>Wait until my data is requested, then I will be notified to approve the transfer</span>
-                                </label>
-                              </FormGroup>
-                            </div>
-
-                            <Alert color="info" className="mt-3" style={{ fontSize: 14 }}>
-                              All personal identifiers are removed before any data leaves the platform.
-                            </Alert>
-                          </div>
-                        )}
-                      </CardBody>
-                    </Card>
-                  </Col>
-                );
-              })}
-            </Row>
-          </CardBody>
-        </Card>
-
-        <Row>
-          <Col md="7" className="mb-3">
+        <div>
+          <div className="mb-3">
             <Card style={{ borderColor: '#1a2f4a', borderWidth: 2 }}>
               <CardBody>
                 <CardTitle tag="h4" style={{ color: '#1a2f4a' }}>Upload History</CardTitle>
@@ -267,9 +163,9 @@ const VolunteerDashboard = () => {
                 )}
               </CardBody>
             </Card>
-          </Col>
+          </div>
 
-          <Col md="5" className="mb-3">
+          <div className="mb-3">
             <Card style={{ borderColor: '#1a2f4a', borderWidth: 2 }}>
               <CardBody>
                 <CardTitle tag="h4" style={{ color: '#1a2f4a' }}>Earnings</CardTitle>
@@ -310,8 +206,8 @@ const VolunteerDashboard = () => {
                 )}
               </CardBody>
             </Card>
-          </Col>
-        </Row>
+          </div>
+        </div>
       </Container>
     </div>
   );

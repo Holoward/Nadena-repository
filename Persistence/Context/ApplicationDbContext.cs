@@ -28,12 +28,10 @@ public sealed class ApplicationDbContext : IdentityDbContext<ApplicationUser>
         base.OnModelCreating(builder);
     }
 
-    public DbSet<Client> Clientes { get; set; }
     public DbSet<Volunteer> Volunteers { get; set; }
     public DbSet<Buyer> Buyers { get; set; }
     public DbSet<Dataset> Datasets { get; set; }
     public DbSet<ConsentRecord> ConsentRecords { get; set; }
-    public DbSet<YoutubeComment> YoutubeComments { get; set; }
     public DbSet<DatasetPurchase> DatasetPurchases { get; set; }
     public DbSet<VolunteerPayment> VolunteerPayments { get; set; }
     public DbSet<SpotifyListeningRecord> SpotifyListeningRecords { get; set; }
@@ -55,9 +53,6 @@ public sealed class ApplicationDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<DeletionRequest> DeletionRequests { get; set; }
     public DbSet<DatasetAccessGrant> DatasetAccessGrants { get; set; }
     public DbSet<ContributorDisbursement> ContributorDisbursements { get; set; }
-
-    // Reviews
-    public DbSet<Review> Reviews { get; set; }
 
     // Subscriptions
     public DbSet<DatasetSubscription> DatasetSubscriptions { get; set; }

@@ -12,47 +12,11 @@ import {
   FormGroup,
   Input,
   Label,
-  Modal,
-  ModalBody,
-  ModalFooter,
-  ModalHeader,
-  Row,
-  Table
+  Row
 } from 'reactstrap';
 import { useAuth } from '../context/AuthContext';
 
 const purchaseTypes = ['OneTime', 'Daily', 'Weekly', 'Monthly', 'Annual'];
-
-const MiniMetricsChart = ({ purchase }) => {
-  if (purchase.purchaseType === 'One-time') {
-    return null;
-  }
-
-  const history = JSON.parse(purchase.metricsHistoryJson || '[]');
-  if (history.length === 0) {
-    return null;
-  }
-
-  const width = 320;
-  const height = 140;
-  const max = Math.max(...history.map((item) => item.count), 1);
-  const points = history.map((item, index) => {
-    const x = (index / Math.max(history.length - 1, 1)) * (width - 20) + 10;
-    const y = height - ((item.count / max) * (height - 20) + 10);
-    return `${x},${y}`;
-  }).join(' ');
-
-  return (
-    <svg viewBox={`0 0 ${width} ${height}`} style={{ width: '100%', height: 180 }}>
-      <polyline fill="none" stroke="#1a2f4a" strokeWidth="3" points={points} />
-      {history.map((item, index) => {
-        const x = (index / Math.max(history.length - 1, 1)) * (width - 20) + 10;
-        const y = height - ((item.count / max) * (height - 20) + 10);
-        return <circle key={`${item.date}-${index}`} cx={x} cy={y} r="4" fill="#1a2f4a" />;
-      })}
-    </svg>
-  );
-};
 
 const BuyerDashboard = () => {
   const { auth, logout } = useAuth();
@@ -60,8 +24,6 @@ const BuyerDashboard = () => {
   const [pools, setPools] = useState([]);
   const [purchases, setPurchases] = useState([]);
   const [preview, setPreview] = useState(null);
-  const [previewOpen, setPreviewOpen] = useState(false);
-  const [purchaseOpen, setPurchaseOpen] = useState(false);
   const [selectedPool, setSelectedPool] = useState(null);
   const [message, setMessage] = useState(null);
   const [filters, setFilters] = useState({ source: '', category: '', maxPrice: '' });
@@ -122,58 +84,6 @@ const BuyerDashboard = () => {
       ? 'Billed annually'
       : 'Billed monthly';
 
-  const openPurchase = (pool) => {
-    setSelectedPool(pool);
-    setPurchaseOpen(true);
-  };
-
-  const fetchPreview = async (poolId) => {
-    const response = await fetch(`/api/v1/DataPool/${poolId}/preview`, {
-      headers: { Authorization: `Bearer ${auth.token}` }
-    });
-    if (!response.ok) {
-      setMessage({ type: 'danger', text: 'Failed to load preview.' });
-      return;
-    }
-    setPreview(await response.json());
-    setPreviewOpen(true);
-  };
-
-  const submitPurchase = async () => {
-    const endpoint = form.recordCount > 500000 ? '/api/v1/DataClient/request-custom-quote' : '/api/v1/DataClient/purchases';
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${auth.token}`,
-        'Content-Type': 'application/json',
-        'Idempotency-Key': crypto.randomUUID()
-      },
-      body: JSON.stringify(form.recordCount > 500000 ? {
-        datasetName: selectedPool?.name || 'Custom dataset',
-        recordCount: form.recordCount
-      } : {
-        poolName: selectedPool?.name,
-        category: selectedPool?.category,
-        purchaseType: form.purchaseType,
-        dataSources: form.dataSources,
-        dateRangeStart: form.dateRangeStart || null,
-        dateRangeEnd: form.dateRangeEnd || null,
-        recordCount: form.recordCount,
-        contributorShareNow: true
-      })
-    });
-
-    const payload = await response.json();
-    if (!response.ok) {
-      setMessage({ type: 'danger', text: payload.message || 'Purchase failed.' });
-      return;
-    }
-
-    setMessage({ type: 'success', text: payload.message || 'Purchase confirmed.' });
-    setPurchaseOpen(false);
-    await load();
-  };
-
   const cancelSubscription = async (purchaseId) => {
     const response = await fetch(`/api/v1/DataClient/my-datasets/${purchaseId}/cancel`, {
       method: 'POST',
@@ -202,17 +112,7 @@ const BuyerDashboard = () => {
 
   return (
     <div>
-      <div style={{ backgroundColor: '#1a2f4a', color: '#fff', padding: '24px 0', marginBottom: 24 }}>
-        <Container>
-          <div className="d-flex justify-content-between align-items-center">
-            <div>
-              <h2 style={{ margin: 0 }}>Data Client Dashboard</h2>
-              <p style={{ margin: '8px 0 0', opacity: 0.85 }}>Discover pools, configure purchases, and manage your datasets.</p>
-            </div>
-            <Button color="light" onClick={logout}>Logout</Button>
-          </div>
-        </Container>
-      </div>
+      <h2>Data Client Dashboard</h2>
 
       <Container>
         {account && !account.emailConfirmed && (
@@ -262,8 +162,7 @@ const BuyerDashboard = () => {
                         <strong>Price preview:</strong> ${Number(pool.pricePerMonth || 0).toFixed(2)}
                       </CardText>
                       <div className="d-flex gap-2">
-                        <Button color="secondary" onClick={() => fetchPreview(pool.id)}>Preview</Button>
-                        <Button color="primary" onClick={() => openPurchase(pool)}>Purchase</Button>
+                        <a href="/marketplace" style={{color:'#6c47ff'}}>Purchase via Marketplace</a>
                       </div>
                     </CardBody>
                   </Card>
@@ -302,15 +201,7 @@ const BuyerDashboard = () => {
 
                     <div className="mt-3">
                       <Button color="primary" size="sm" href={purchase.downloadUrl} target="_blank" rel="noreferrer">Download</Button>{' '}
-                      <Button color="secondary" size="sm" href={`/api/v1/DataClient/my-datasets/${purchase.id}/invoice`} target="_blank" rel="noreferrer">Invoice PDF</Button>{' '}
-                      <Button color="info" size="sm" onClick={() => shareDataset(purchase.id)}>Share with teammate</Button>{' '}
-                      {purchase.purchaseType !== 'One-time' && (
-                        <Button color="danger" size="sm" onClick={() => cancelSubscription(purchase.id)}>Cancel subscription</Button>
-                      )}
-                    </div>
-
-                    <div className="mt-3">
-                      <MiniMetricsChart purchase={purchase} />
+                      <Button color="secondary" size="sm" href={`/api/v1/DataClient/my-datasets/${purchase.id}/invoice`} target="_blank" rel="noreferrer">Invoice PDF</Button>
                     </div>
                   </CardBody>
                 </Card>
@@ -319,64 +210,6 @@ const BuyerDashboard = () => {
           </CardBody>
         </Card>
       </Container>
-
-      <Modal isOpen={previewOpen} toggle={() => setPreviewOpen(false)} size="lg">
-        <ModalHeader toggle={() => setPreviewOpen(false)}>Anonymized Preview</ModalHeader>
-        <ModalBody>
-          <pre style={{ whiteSpace: 'pre-wrap', marginBottom: 0 }}>{JSON.stringify(preview?.data || preview, null, 2)}</pre>
-        </ModalBody>
-      </Modal>
-
-      <Modal isOpen={purchaseOpen} toggle={() => setPurchaseOpen(false)} size="lg">
-        <ModalHeader toggle={() => setPurchaseOpen(false)}>Subscription Builder</ModalHeader>
-        <ModalBody>
-          <Row>
-            <Col md="6">
-              <FormGroup>
-                <Label>Purchase type</Label>
-                <Input type="select" value={form.purchaseType} onChange={(e) => setForm({ ...form, purchaseType: e.target.value })}>
-                  {purchaseTypes.map((type) => <option key={type} value={type}>{type === 'OneTime' ? 'One-time' : type}</option>)}
-                </Input>
-              </FormGroup>
-              <FormGroup>
-                <Label>Data sources included</Label>
-                <Input type="select" multiple value={form.dataSources} onChange={(e) => setForm({ ...form, dataSources: Array.from(e.target.selectedOptions).map((option) => option.value) })}>
-                  <option>YouTube</option>
-                  <option>Spotify</option>
-                  <option>Netflix</option>
-                </Input>
-              </FormGroup>
-              <FormGroup>
-                <Label>Record count: {form.recordCount.toLocaleString()}</Label>
-                <Input type="range" min="100" max="1000000" step="100" value={form.recordCount} onChange={(e) => setForm({ ...form, recordCount: Number(e.target.value) })} />
-              </FormGroup>
-              <FormGroup>
-                <Label>Date range start</Label>
-                <Input type="date" value={form.dateRangeStart} onChange={(e) => setForm({ ...form, dateRangeStart: e.target.value })} />
-              </FormGroup>
-              <FormGroup>
-                <Label>Date range end</Label>
-                <Input type="date" value={form.dateRangeEnd} onChange={(e) => setForm({ ...form, dateRangeEnd: e.target.value })} />
-              </FormGroup>
-            </Col>
-            <Col md="6">
-              <Card body>
-                <CardTitle tag="h5">Live pricing</CardTitle>
-                <p><strong>Total price:</strong> ${livePrice.toFixed(2)}</p>
-                <p><strong>Billing frequency:</strong> {billingLabel}</p>
-                <p><strong>Included:</strong> {form.dataSources.join(', ') || 'No sources selected'} • {form.recordCount.toLocaleString()} records</p>
-                {form.recordCount > 500000 && (
-                  <Alert color="info">Large datasets are routed to a custom quote request.</Alert>
-                )}
-              </Card>
-            </Col>
-          </Row>
-        </ModalBody>
-        <ModalFooter>
-          <Button color="secondary" onClick={() => setPurchaseOpen(false)}>Close</Button>
-          <Button color="primary" onClick={submitPurchase}>{form.recordCount > 500000 ? 'Request custom quote' : 'Confirm purchase'}</Button>
-        </ModalFooter>
-      </Modal>
     </div>
   );
 };

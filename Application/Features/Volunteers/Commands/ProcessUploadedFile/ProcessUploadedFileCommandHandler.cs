@@ -2,57 +2,47 @@ using System.IO.Compression;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.RegularExpressions;
-using Application.Common;
 using Application.Interfaces;
 using Application.Wrappers;
 using Application.Exceptions;
 using Domain.Entities;
 using Domain.Enums;
-using HtmlAgilityPack;
 using MediatR;
 using Microsoft.Extensions.Configuration;
 using System.Security.Cryptography;
-using System.Text;
 
 namespace Application.Features.Volunteers.Commands.ProcessUploadedFile;
 
 public class ProcessUploadedFileCommandHandler : IRequestHandler<ProcessUploadedFileCommand, ServiceResponse<ProcessUploadedFileResult>>
 {
     private readonly IVolunteerRepository _volunteerRepository;
-    private readonly IYoutubeCommentRepository _youtubeCommentRepository;
     private readonly ISpotifyRecordRepository _spotifyRecordRepository;
     private readonly INetflixRecordRepository _netflixRecordRepository;
     private readonly IConfiguration _configuration;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IAuditLogService _auditLogService;
-    private readonly IDeduplicationService _deduplicationService;
     private string _lastHashComputed = string.Empty;
 
     // Security constants
     private const long MaxFileSizeBytes = 500L * 1024 * 1024; // 500MB
     private const int MaxEntryCount = 10000;
-    private const int MaxCommentCount = 50000;
     private const double MaxCompressionRatio = 100.0;
     private static readonly byte[] ZipMagicBytes = { 0x50, 0x4B, 0x03, 0x04 }; // PK\x03\x04
 
     public ProcessUploadedFileCommandHandler(
         IVolunteerRepository volunteerRepository,
-        IYoutubeCommentRepository youtubeCommentRepository,
         ISpotifyRecordRepository spotifyRecordRepository,
         INetflixRecordRepository netflixRecordRepository,
         IConfiguration configuration,
         IHttpClientFactory httpClientFactory,
-        IAuditLogService auditLogService,
-        IDeduplicationService deduplicationService)
+        IAuditLogService auditLogService)
     {
         _volunteerRepository = volunteerRepository;
-        _youtubeCommentRepository = youtubeCommentRepository;
         _spotifyRecordRepository = spotifyRecordRepository;
         _netflixRecordRepository = netflixRecordRepository;
         _configuration = configuration;
         _httpClientFactory = httpClientFactory;
         _auditLogService = auditLogService;
-        _deduplicationService = deduplicationService;
     }
 
     public async Task<ServiceResponse<ProcessUploadedFileResult>> Handle(ProcessUploadedFileCommand request, CancellationToken cancellationToken)
@@ -133,18 +123,13 @@ public class ProcessUploadedFileCommandHandler : IRequestHandler<ProcessUploaded
             }
             else
             {
-                var result = await ProcessYouTubeZipAsyncWithLimit(zipArchive, volunteer);
-                recordCount = result.count;
-                warningMessage = result.warning;
+                // YouTube comment processing removed — behavioral data now collected via TakeoutController
                 volunteer.DataSourceType = DataSourceType.YouTube;
             }
         }
         else
         {
-            // Process raw JSON file
-            var result = await ProcessRawJsonAsyncWithLimit(buffer, volunteer);
-            recordCount = result.count;
-            warningMessage = result.warning;
+            // YouTube comment processing removed — behavioral data now collected via TakeoutController
             volunteer.DataSourceType = DataSourceType.YouTube;
         }
 
@@ -529,315 +514,6 @@ public class ProcessUploadedFileCommandHandler : IRequestHandler<ProcessUploaded
         return showTitle.Trim();
     }
 
-    private async Task<int> ProcessYouTubeZipAsync(ZipArchive zipArchive, Volunteer volunteer)
-    {
-        var comments = new List<YoutubeComment>();
-        var volunteerName = volunteer.UserId;
-
-        var commentFiles = new[]
-        {
-            "Takeout/YouTube and YouTube Music/my-comments/my-comments.html",
-            "Takeout/YouTube/my-comments/my-comments.html",
-            "YouTube and YouTube Music/my-comments/my-comments.html",
-            "YouTube/my-comments/my-comments.html",
-            "my-comments/my-comments.html"
-        };
-
-        ZipArchiveEntry? commentFileEntry = null;
-        foreach (var path in commentFiles)
-        {
-            commentFileEntry = zipArchive.GetEntry(path);
-            if (commentFileEntry != null)
-                break;
-        }
-
-        if (commentFileEntry == null)
-        {
-            throw new ApiException("Could not find my-comments.html in the uploaded ZIP file");
-        }
-
-        using var streamReader = new StreamReader(commentFileEntry.Open());
-        var htmlContent = await streamReader.ReadToEndAsync();
-
-        var htmlDoc = new HtmlDocument();
-        htmlDoc.LoadHtml(htmlContent);
-
-        var commentNodes = htmlDoc.DocumentNode.SelectNodes("//div[contains(@class, 'comment-thread')]") 
-                          ?? htmlDoc.DocumentNode.SelectNodes("//div[contains(@class, 'comment')]")
-                          ?? htmlDoc.DocumentNode.SelectNodes("//ytd-comment-thread-renderer")
-                          ?? htmlDoc.DocumentNode.SelectNodes("//ytd-comment-renderer");
-
-        if (commentNodes != null)
-        {
-            foreach (var commentNode in commentNodes)
-            {
-                var comment = ParseComment(commentNode, volunteer.Id);
-                if (comment != null)
-                {
-                    comment.CommentText = AnonymizeComment(comment.CommentText, volunteerName);
-                    comment.IsAnonymized = true;
-                    comments.Add(comment);
-                }
-            }
-        }
-        else
-        {
-            var textNodes = htmlDoc.DocumentNode.SelectNodes("//p|//div[@content]");
-            if (textNodes != null)
-            {
-                foreach (var textNode in textNodes)
-                {
-                    var text = textNode.InnerText.Trim();
-                    if (text.Length > 10 && text.Length < 5000)
-                    {
-                        var comment = new YoutubeComment
-                        {
-                            VolunteerId = volunteer.Id,
-                            CommentText = AnonymizeComment(text, volunteerName),
-                            VideoId = ExtractVideoId(textNode),
-                            Timestamp = DateTime.UtcNow,
-                            LikeCount = 0,
-                            IsAnonymized = true
-                        };
-                        comments.Add(comment);
-                    }
-                }
-            }
-        }
-
-        // DEDUPLICATION CHECK: Verify content uniqueness before storing
-        if (comments.Any())
-        {
-            var commentTexts = comments.Select(c => c.CommentText).ToList();
-            var videoIds = comments.Select(c => c.VideoId ?? string.Empty).ToList();
-
-            var deduplicationResult = await _deduplicationService.CheckDuplicateAsync(
-                volunteer.Id, commentTexts, videoIds);
-
-            // Update volunteer with upload attempt info
-            volunteer.UploadAttempts++;
-            volunteer.LastUploadAttempt = DateTime.UtcNow;
-            volunteer.DeduplicationScore = deduplicationResult.NewContentPercentage;
-
-            if (!deduplicationResult.IsAccepted)
-            {
-                // Reject the upload - don't store comments
-                await _volunteerRepository.UpdateAsync(volunteer);
-                throw new ApiException(deduplicationResult.Message);
-            }
-
-            // Accept the upload - store comments
-            await _youtubeCommentRepository.BulkInsertAsync(comments);
-        }
-
-        return comments.Count;
-    }
-
-    /// <summary>
-    /// SECURITY CHECK 7: Process YouTube ZIP with maximum comment count limit
-    /// </summary>
-    private async Task<(int count, string? warning)> ProcessYouTubeZipAsyncWithLimit(ZipArchive zipArchive, Volunteer volunteer)
-    {
-        var comments = new List<YoutubeComment>();
-        var volunteerName = volunteer.UserId;
-        string? warning = null;
-
-        var commentFiles = new[]
-        {
-            "Takeout/YouTube and YouTube Music/my-comments/my-comments.html",
-            "Takeout/YouTube/my-comments/my-comments.html",
-            "YouTube and YouTube Music/my-comments/my-comments.html",
-            "YouTube/my-comments/my-comments.html",
-            "my-comments/my-comments.html"
-        };
-
-        ZipArchiveEntry? commentFileEntry = null;
-        foreach (var path in commentFiles)
-        {
-            commentFileEntry = zipArchive.GetEntry(path);
-            if (commentFileEntry != null)
-                break;
-        }
-
-        if (commentFileEntry == null)
-        {
-            throw new ApiException("Could not find my-comments.html in the uploaded ZIP file");
-        }
-
-        using var streamReader = new StreamReader(commentFileEntry.Open());
-        var htmlContent = await streamReader.ReadToEndAsync();
-
-        var htmlDoc = new HtmlDocument();
-        htmlDoc.LoadHtml(htmlContent);
-
-        var commentNodes = htmlDoc.DocumentNode.SelectNodes("//div[contains(@class, 'comment-thread')]") 
-                          ?? htmlDoc.DocumentNode.SelectNodes("//div[contains(@class, 'comment')]")
-                          ?? htmlDoc.DocumentNode.SelectNodes("//ytd-comment-thread-renderer")
-                          ?? htmlDoc.DocumentNode.SelectNodes("//ytd-comment-renderer");
-
-        if (commentNodes != null)
-        {
-            foreach (var commentNode in commentNodes)
-            {
-                // SECURITY CHECK 7: Maximum comment count limit
-                if (comments.Count >= MaxCommentCount)
-                {
-                    warning = "Warning: Only first 50000 comments were processed. Additional comments were ignored.";
-                    break;
-                }
-
-                var comment = ParseComment(commentNode, volunteer.Id);
-                if (comment != null)
-                {
-                    comment.CommentText = AnonymizeComment(comment.CommentText, volunteerName);
-                    comment.IsAnonymized = true;
-                    comments.Add(comment);
-                }
-            }
-        }
-        else
-        {
-            var textNodes = htmlDoc.DocumentNode.SelectNodes("//p|//div[@content]");
-            if (textNodes != null)
-            {
-                foreach (var textNode in textNodes)
-                {
-                    // SECURITY CHECK 7: Maximum comment count limit
-                    if (comments.Count >= MaxCommentCount)
-                    {
-                        warning = "Warning: Only first 50000 comments were processed. Additional comments were ignored.";
-                        break;
-                    }
-
-                    var text = textNode.InnerText.Trim();
-                    if (text.Length > 10 && text.Length < 5000)
-                    {
-                        var comment = new YoutubeComment
-                        {
-                            VolunteerId = volunteer.Id,
-                            CommentText = AnonymizeComment(text, volunteerName),
-                            VideoId = ExtractVideoId(textNode),
-                            Timestamp = DateTime.UtcNow,
-                            LikeCount = 0,
-                            IsAnonymized = true
-                        };
-                        comments.Add(comment);
-                    }
-                }
-            }
-        }
-
-        return await ProcessCommentsWithDeduplicationAsync(comments, volunteer, warning);
-    }
-
-    private async Task<(int count, string? warning)> ProcessRawJsonAsyncWithLimit(Stream jsonStream, Volunteer volunteer)
-    {
-        var comments = new List<YoutubeComment>();
-        var volunteerName = volunteer.UserId;
-        string? warning = null;
-
-        using var streamReader = new StreamReader(jsonStream);
-        var jsonContent = await streamReader.ReadToEndAsync();
-
-        try
-        {
-            using var document = JsonDocument.Parse(jsonContent);
-            
-            // Allow array of comments or object with items
-            JsonElement root = document.RootElement;
-            JsonElement.ArrayEnumerator elements = default;
-            bool isArray = false;
-
-            if (root.ValueKind == JsonValueKind.Array)
-            {
-                elements = root.EnumerateArray();
-                isArray = true;
-            }
-            else if (root.ValueKind == JsonValueKind.Object && root.TryGetProperty("items", out var items) && items.ValueKind == JsonValueKind.Array)
-            {
-                elements = items.EnumerateArray();
-                isArray = true;
-            }
-
-            if (isArray)
-            {
-                foreach (var item in elements)
-                {
-                    if (comments.Count >= MaxCommentCount)
-                    {
-                        warning = "Warning: Only first 50000 comments were processed. Additional comments were ignored.";
-                        break;
-                    }
-
-                    string text = string.Empty;
-                    if (item.TryGetProperty("snippet", out var snippet))
-                    {
-                        if (snippet.TryGetProperty("textDisplay", out var textDisplay)) text = textDisplay.GetString() ?? "";
-                        else if (snippet.TryGetProperty("textOriginal", out var textOrig)) text = textOrig.GetString() ?? "";
-                    }
-                    else if (item.TryGetProperty("text", out var textProp))
-                    {
-                        text = textProp.GetString() ?? "";
-                    }
-                    else if (item.TryGetProperty("comment", out var commentProp))
-                    {
-                        text = commentProp.GetString() ?? "";
-                    }
-
-                    if (!string.IsNullOrWhiteSpace(text))
-                    {
-                        var comment = new YoutubeComment
-                        {
-                            VolunteerId = volunteer.Id,
-                            CommentText = AnonymizeComment(text, volunteerName),
-                            VideoId = "json-upload",
-                            Timestamp = DateTime.UtcNow,
-                            LikeCount = 0,
-                            IsAnonymized = true
-                        };
-                        comments.Add(comment);
-                    }
-                }
-            }
-        }
-        catch
-        {
-            throw new ApiException("Invalid JSON format");
-        }
-
-        return await ProcessCommentsWithDeduplicationAsync(comments, volunteer, warning);
-    }
-
-    private async Task<(int count, string? warning)> ProcessCommentsWithDeduplicationAsync(List<YoutubeComment> comments, Volunteer volunteer, string? warning)
-    {
-        // DEDUPLICATION CHECK: Verify content uniqueness before storing
-        if (comments.Any())
-        {
-            var commentTexts = comments.Select(c => c.CommentText).ToList();
-            var videoIds = comments.Select(c => c.VideoId ?? string.Empty).ToList();
-
-            var deduplicationResult = await _deduplicationService.CheckDuplicateAsync(
-                volunteer.Id, commentTexts, videoIds);
-
-            // Update volunteer with upload attempt info
-            volunteer.UploadAttempts++;
-            volunteer.LastUploadAttempt = DateTime.UtcNow;
-            volunteer.DeduplicationScore = deduplicationResult.NewContentPercentage;
-
-            if (!deduplicationResult.IsAccepted)
-            {
-                // Reject the upload - don't store comments
-                await _volunteerRepository.UpdateAsync(volunteer);
-                throw new ApiException(deduplicationResult.Message);
-            }
-
-            // Accept the upload - store comments
-            await _youtubeCommentRepository.BulkInsertAsync(comments);
-        }
-
-        return (comments.Count, warning);
-    }
-
     private DateTime ParseSpotifyTimestamp(string? timestamp)
     {
         if (string.IsNullOrEmpty(timestamp))
@@ -855,123 +531,6 @@ public class ProcessUploadedFileCommandHandler : IRequestHandler<ProcessUploaded
             return string.Empty;
 
         return field;
-    }
-
-    private YoutubeComment? ParseComment(HtmlNode commentNode, int volunteerId)
-    {
-        try
-        {
-            var textNode = commentNode.SelectSingleNode(".//div[contains(@class, 'comment-text')]")
-                            ?? commentNode.SelectSingleNode(".//yt-formatted-string")
-                            ?? commentNode.SelectSingleNode(".//span[@id='content-text']")
-                            ?? commentNode.SelectSingleNode(".//div[@id='content']");
-
-            var commentText = textNode?.InnerText.Trim() ?? string.Empty;
-
-            if (string.IsNullOrWhiteSpace(commentText))
-                return null;
-
-            var linkNode = commentNode.SelectSingleNode(".//a[contains(@href, 'youtube.com/watch')]")
-                            ?? commentNode.SelectSingleNode(".//a[contains(@href, 'youtu.be')]");
-            
-            var videoId = ExtractVideoIdFromUrl(linkNode?.GetAttributeValue("href", string.Empty) ?? string.Empty);
-
-            var timestampNode = commentNode.SelectSingleNode(".//div[contains(@class, 'time')]")
-                                 ?? commentNode.SelectSingleNode(".//yt-formatted-string[contains(@class, 'date')]");
-            
-            DateTime timestamp;
-            if (!DateTime.TryParse(timestampNode?.InnerText.Trim() ?? string.Empty, out timestamp))
-            {
-                timestamp = DateTime.UtcNow;
-            }
-
-            var likeNode = commentNode.SelectSingleNode(".//span[contains(@class, 'like-count')]")
-                            ?? commentNode.SelectSingleNode(".//yt-formatted-string[contains(@class, 'like-count')]");
-            
-            int likeCount = 0;
-            if (int.TryParse(likeNode?.InnerText.Trim() ?? "0", out var likes))
-            {
-                likeCount = likes;
-            }
-
-            return new YoutubeComment
-            {
-                VolunteerId = volunteerId,
-                CommentText = commentText,
-                VideoId = videoId,
-                Timestamp = timestamp,
-                LikeCount = likeCount,
-                IsAnonymized = false
-            };
-        }
-        catch
-        {
-            return null;
-        }
-    }
-
-    private string ExtractVideoId(HtmlNode node)
-    {
-        var linkNode = node.SelectSingleNode(".//a[contains(@href, 'youtube.com/watch')]")
-                 ?? node.SelectSingleNode(".//a[contains(@href, 'youtu.be')]");
-        
-        return ExtractVideoIdFromUrl(linkNode?.GetAttributeValue("href", string.Empty) ?? string.Empty);
-    }
-
-    private string ExtractVideoIdFromUrl(string url)
-    {
-        if (string.IsNullOrEmpty(url))
-            return string.Empty;
-
-        var match = Regex.Match(url, @"(?:v=|/v/|/embed/)([a-zA-Z0-9_-]{11})");
-        if (match.Success)
-            return match.Groups[1].Value;
-
-        match = Regex.Match(url, @"youtu\.be/([a-zA-Z0-9_-]{11})");
-        if (match.Success)
-            return match.Groups[1].Value;
-
-        return string.Empty;
-    }
-
-    private string AnonymizeComment(string commentText, string volunteerIdentifier)
-    {
-        if (string.IsNullOrEmpty(commentText))
-            return commentText;
-
-        // Sanitize comment text first
-        var cleanedText = InputSanitizer.SanitizeCommentText(commentText);
-
-        var emailPattern = @"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}";
-        cleanedText = Regex.Replace(cleanedText, emailPattern, "[EMAIL_REDACTED]");
-
-        var phonePatterns = new[]
-        {
-            @"\+?\d{1,3}[-.\s]?\(?\d{1,4}\)?[-.\s]?\d{1,4}[-.\s]?\d{1,9}",
-            @"\b\d{3}[-.]?\d{3}[-.]?\d{4}\b",
-            @"\b\(\d{3}\)\s*\d{3}[-.]?\d{4}\b"
-        };
-        
-        foreach (var pattern in phonePatterns)
-        {
-            cleanedText = Regex.Replace(cleanedText, pattern, "[PHONE_REDACTED]");
-        }
-
-        if (!string.IsNullOrEmpty(volunteerIdentifier))
-        {
-            cleanedText = cleanedText.Replace(volunteerIdentifier, "[NAME_REDACTED]");
-            
-            var nameParts = volunteerIdentifier.Split(new[] { ' ', '.', '_', '-' }, StringSplitOptions.RemoveEmptyEntries);
-            foreach (var part in nameParts)
-            {
-                if (part.Length > 2)
-                {
-                    cleanedText = cleanedText.Replace(part, "[NAME_REDACTED]");
-                }
-            }
-        }
-
-        return cleanedText.Trim();
     }
 
     // Helper class for deserializing Spotify streaming history

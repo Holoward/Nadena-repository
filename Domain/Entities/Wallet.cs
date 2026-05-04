@@ -2,6 +2,9 @@ using Domain.Common;
 
 namespace Domain.Entities;
 
+/// <summary>
+/// Tracks a contributor's or platform's balance. PendingBalance holds amounts credited but not yet paid out via PayPal. Balance holds amounts available for withdrawal.
+/// </summary>
 public class Wallet : AuditableBaseEntityGuid
 {
     public string OwnerType { get; set; } = "User"; // User | Platform

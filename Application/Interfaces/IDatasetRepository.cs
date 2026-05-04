@@ -8,7 +8,6 @@ public interface IDatasetRepository
     Task<IEnumerable<Dataset>> GetAllAsync();
     Task AddAsync(Dataset dataset);
     Task UpdateAsync(Dataset dataset);
-    Task<List<YoutubeComment>> GetAnonymizedCommentsByVolunteerIds(List<Guid> volunteerIds);
     Task<IEnumerable<Dataset>> GetFlaggedAsync();
     IVolunteerRepository? GetVolunteerRepository();
 }

@@ -2,6 +2,9 @@ using Domain.Common;
 
 namespace Domain.Entities;
 
+/// <summary>
+/// Records a completed dataset purchase. Tracks the buyer, amount paid, delivery endpoint, download URL, and subscription details.
+/// </summary>
 public class DatasetPurchase : AuditableBaseEntityGuid
 {
     public Guid BuyerId { get; set; }

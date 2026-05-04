@@ -35,7 +35,6 @@ public class PurchaseLicenseCommandHandler : IRequestHandler<PurchaseLicenseComm
     private readonly IDataPoolRepository _poolRepository;
     private readonly IDataLicenseRepository _licenseRepository;
     private readonly IApiKeyService _apiKeyService;
-    private readonly IBlockchainService _blockchainService;
     private readonly IRepositoryAsync<ApiKey> _apiKeyRepository;
     private readonly IBuyerRepository _buyerRepository;
 
@@ -43,14 +42,12 @@ public class PurchaseLicenseCommandHandler : IRequestHandler<PurchaseLicenseComm
         IDataPoolRepository poolRepository,
         IDataLicenseRepository licenseRepository,
         IApiKeyService apiKeyService,
-        IBlockchainService blockchainService,
         IRepositoryAsync<ApiKey> apiKeyRepository,
         IBuyerRepository buyerRepository)
     {
         _poolRepository = poolRepository;
         _licenseRepository = licenseRepository;
         _apiKeyService = apiKeyService;
-        _blockchainService = blockchainService;
         _apiKeyRepository = apiKeyRepository;
         _buyerRepository = buyerRepository;
     }
@@ -116,12 +113,10 @@ public class PurchaseLicenseCommandHandler : IRequestHandler<PurchaseLicenseComm
         };
         await _licenseRepository.AddAsync(license);
 
-        // 6. Trigger automated revenue distribution to volunteers
-        var txRef = await _blockchainService.DistributeRevenueAsync(
-            license.Id,
-            pool.Id,
-            totalAmount,
-            pool.RevenueSharePercent);
+        // Revenue distribution is now handled by ProcessDatasetSalePaymentsCommand
+        // triggered from WebhookController after Stripe payment confirmation.
+        // This local reference is kept for DataLicense audit trail only.
+        var txRef = $"ledger-{license.Id}";
 
         license.DistributionTxRef = txRef;
         await _licenseRepository.UpdateAsync(license);

@@ -19,12 +19,10 @@ public class GetAllDatasetsQuery : IRequest<ServiceResponse<PaginatedResult<Data
 public class GetAllDatasetsQueryHandler : IRequestHandler<GetAllDatasetsQuery, ServiceResponse<PaginatedResult<DatasetDto>>>
 {
     private readonly IDatasetRepository _datasetRepository;
-    private readonly IReviewRepository _reviewRepository;
 
-    public GetAllDatasetsQueryHandler(IDatasetRepository datasetRepository, IReviewRepository reviewRepository)
+    public GetAllDatasetsQueryHandler(IDatasetRepository datasetRepository)
     {
         _datasetRepository = datasetRepository;
-        _reviewRepository = reviewRepository;
     }
 
     public async Task<ServiceResponse<PaginatedResult<DatasetDto>>> Handle(GetAllDatasetsQuery request, CancellationToken cancellationToken)
@@ -59,9 +57,6 @@ public class GetAllDatasetsQueryHandler : IRequestHandler<GetAllDatasetsQuery, S
 
         foreach (var d in filteredList)
         {
-            var avgRating = await _reviewRepository.GetAverageRatingAsync(d.Id);
-            var reviewCount = await _reviewRepository.GetReviewCountAsync(d.Id);
-
             datasetDtos.Add(new DatasetDto
             {
                 Id = d.Id,
@@ -81,8 +76,6 @@ public class GetAllDatasetsQueryHandler : IRequestHandler<GetAllDatasetsQuery, S
                 IntendedUseCases = d.IntendedUseCases,
                 DataFormat = d.DataFormat ?? "CSV",
                 SchemaDescription = d.SchemaDescription,
-                AverageRating = avgRating,
-                ReviewCount = reviewCount,
                 ProvenanceDownloadUrl = $"/datasets/provenance_{d.Id}.json"
             });
         }

@@ -7,12 +7,18 @@ using Microsoft.Extensions.Logging;
 
 namespace Persistence.Services;
 
+/// <summary>
+/// Background service that runs every 30 minutes. Checks each contributor's Google Drive for new Takeout ZIP exports and processes them automatically without any user action required.
+/// </summary>
 public class DrivePollingService : BackgroundService
 {
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<DrivePollingService> _logger;
     private readonly TimeSpan _interval = TimeSpan.FromMinutes(30);
 
+    /// <summary>
+    /// Creates the polling service with scoped dependency access and logging.
+    /// </summary>
     public DrivePollingService(
         IServiceScopeFactory scopeFactory,
         ILogger<DrivePollingService> logger)
@@ -21,6 +27,9 @@ public class DrivePollingService : BackgroundService
         _logger = logger;
     }
 
+    /// <summary>
+    /// Runs the polling loop until the host requests shutdown.
+    /// </summary>
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _logger.LogInformation("DrivePollingService started.");
@@ -40,6 +49,9 @@ public class DrivePollingService : BackgroundService
         }
     }
 
+    /// <summary>
+    /// Polls every active contributor token, validates any new Takeout ZIP, delivers payloads, and credits contributor wallets.
+    /// </summary>
     private async Task PollAllContributorsAsync(CancellationToken cancellationToken)
     {
         using var scope = _scopeFactory.CreateScope();

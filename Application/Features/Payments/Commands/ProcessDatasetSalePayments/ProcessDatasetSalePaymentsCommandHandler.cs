@@ -32,9 +32,9 @@ public class ProcessDatasetSalePaymentsCommandHandler : IRequestHandler<ProcessD
     public async Task<ServiceResponse<bool>> Handle(ProcessDatasetSalePaymentsCommand request, CancellationToken cancellationToken)
     {
         var settings = _configuration.GetSection("NadenaSettings");
-        var contributorSharePercent = settings.GetValue<decimal>("ContributorSharePercent", 40m);
-        var modeSharePercent = settings.GetValue<decimal>("ModeSharePercent", 20m);
-        var nadenaSharePercent = settings.GetValue<decimal>("NadenaSharePercent", 40m);
+        var contributorSharePercent = settings.GetValue<decimal>("ContributorSharePercent", 0m);
+        var modeSharePercent = settings.GetValue<decimal>("ModeSharePercent", 0m);
+        var nadenaSharePercent = settings.GetValue<decimal>("NadenaSharePercent", 0m);
 
         var volunteers = await _volunteerRepository.ListAsync(cancellationToken);
         var donors = volunteers.Where(v => v.HasDonated).ToList();

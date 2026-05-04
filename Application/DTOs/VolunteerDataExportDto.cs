@@ -8,18 +8,9 @@ public class VolunteerDataExportDto
     public string? PayPalEmail { get; set; }
     public string Status { get; set; } = string.Empty;
     public DateTime CreatedAt { get; set; }
-    public List<YoutubeCommentExportDto> YoutubeComments { get; set; } = new();
     public List<ConsentRecordExportDto> ConsentRecords { get; set; } = new();
     public List<PaymentExportDto> PaymentHistory { get; set; } = new();
     public List<UploadHistoryExportDto> UploadHistory { get; set; } = new();
-}
-
-public class YoutubeCommentExportDto
-{
-    public string VideoId { get; set; } = string.Empty;
-    public string VideoTitle { get; set; } = string.Empty;
-    public string CommentText { get; set; } = string.Empty;
-    public DateTime CommentDate { get; set; }
 }
 
 public class ConsentRecordExportDto

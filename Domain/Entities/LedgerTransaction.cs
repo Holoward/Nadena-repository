@@ -2,6 +2,9 @@ using Domain.Common;
 
 namespace Domain.Entities;
 
+/// <summary>
+/// Immutable record of every money movement on the platform. Types include ContributorCredit, ModeFee, PlatformRevenue, and ContributorPayout. Append-only — records cannot be modified once created.
+/// </summary>
 public class LedgerTransaction : AuditableBaseEntityGuid
 {
     public Guid FromWalletId { get; set; }

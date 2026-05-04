@@ -1,81 +1,129 @@
-# NADENA
+# Nadena
 
-NADENA is a B2B Data Licensing Engine and Consent-Based Data Monetization Platform. It acts as a secure, transparent technical bridge connecting everyday users who generate valuable digital data (Volunteers) with enterprises seeking high-quality analytic datasets (Buyers).
+Consent-based behavioral data marketplace. Contributors export their YouTube, Spotify, and Netflix activity via Google Takeout and choose to license anonymized behavioral records to researchers and AI companies. The platform handles consent documentation, validation, anonymization, delivery, and payment splitting automatically.
 
-## Key Features
-
-* **Consent & Privacy First**: A strict GDPR/CCPA respectful pipeline where volunteers actively choose to share specific data vectors and can instantly invoke full Takeout/Deletion requests to scrub their traces.
-* **B2B Licensing Marketplace**: A data marketplace where enterprise clients actively browse pooled data (`DataPools`), build subscriptions, and securely purchase licenses utilizing seamless Stripe integrations.
-* **Profit Sharing Ecosystem**: Volunteer data is anonymized and pooled. When enterprise clients purchase a license, the backend automatically calculates platform fees and distributes equitable `LedgerTransactions` down into the digital `Wallets` of contributing volunteers.
-* **Universal Access**: Features specialized user interfaces for distinct roles — a React web dashboard for Enterprise Buyers and an Expo mobile application for Volunteers.
-
-## System Architecture (The Onion)
-
-The project backend is engineered leveraging **.NET 8/9 ASP.NET Core** and strict **Clean / Onion Architecture**. It enforces strict separation of concerns, heavily prioritizing CQRS design patterns.
-
-### The Tech Stack
-* **Backend Framework**: ASP.NET Core Web API
-* **Application Logic**: CQRS driven by `MediatR`, fortified by `FluentValidation`. Telemetry runs via `Serilog`.
-* **Database Pipeline**: Entity Framework Core. *(Note: Currently mapped to SQLite `OnionArchitecture.db` for rapid prototyping; ready to hot-swap to PostgreSQL).*
-* **Authentication**: Token-based ASP.NET Core Identity & custom JWT configurations.
-* **Frontends**: 
-  * `WebApi/ClientApp/` — A comprehensive React.js Single Page Application functioning as the Buyer portal and Admin dashboard.
-  * `NadenaApp/` — An Expo (React Native) build handling volunteer onboarding, surveys, and digital wallet tracking.
-  * *Browser Extension Component (Chrome)* — A dedicated scraper injecting isolated content scripts to securely extract verified analytical traces.
-
-### Navigating the Solution Layers
-1. **`Domain`**: Pure enterprise logic. Absolutely zero external framework dependencies bleed into this layer. Contains core entities: `DataPool`, `Volunteer`, `Dataset`, `Wallet`, and `ConsentRecord`. 
-2. **`Application`**: Application-specific handlers separated neatly into `/Features` (e.g., `Donation`, `Licensing`, `Takeout`, `Survey`).
-3. **`Persistence`**: EF Core contexts, structural migrations, and automated database marketplace default `Seeders`.
-4. **`WebApi`**: The Presentation layer edge. Contains the HTTP Controllers, API Rate Limiters, Stripe payload handlers, and global CORS policies inside `Program.cs`.
+**nadena.tech** -- david@nadena.tech
 
 ---
 
-## Getting Started Locally
+## What it does
+
+- Contributors authorize Google Drive access once, request a Takeout export, and the platform picks it up automatically
+- A background service polls each contributor's Drive every 30 minutes for new exports
+- Every submission runs through structural validation, schema checks, timestamp plausibility, and account ID cross-referencing before any payment is credited
+- Anonymized behavioral signals are forwarded directly to the buyer's configured delivery endpoint -- no raw data is ever stored
+- Revenue splits automatically: configurable percentages to contributors (PayPal Payouts), distribution partners, and platform
+
+---
+
+## Stack
+
+| Layer | Technology |
+|---|---|
+| Backend | .NET 10, onion architecture, MediatR CQRS, FluentValidation, Serilog |
+| Database | SQLite (pilot) -- EF Core migrations -- ready to swap to PostgreSQL |
+| Auth | ASP.NET Core Identity + JWT |
+| Buyer payments | Stripe Checkout + Webhook |
+| Contributor payouts | PayPal Payouts API |
+| Storage | Cloudflare R2 -- process-and-delete model |
+| Google OAuth | drive.readonly scope -- AES-256 encrypted refresh tokens |
+| Background service | DrivePollingService (IHostedService) -- 30-minute interval |
+| Frontend | React served by .NET in production |
+
+---
+
+## Architecture
+
+```
+Domain/          -- entities only (Volunteer, DatasetPurchase, Wallet, LedgerTransaction, ContributorOAuthToken)
+Application/     -- commands, queries, interfaces (ProcessDatasetSalePayments, PayVolunteers, ITakeoutValidationService)
+Persistence/     -- implementations (TakeoutValidationService, DataDeliveryService, DrivePollingService, GoogleDriveService)
+WebApi/          -- controllers + React frontend (TakeoutController, OAuthController, WebhookController, AdminController)
+```
+
+---
+
+## Running locally
 
 ### Prerequisites
-* **.NET 8.0 SDK** (or newer)
-* **Node.js** (v18+ recommended)
-* Optional: The Expo Go app on your mobile device for native testing.
+- .NET 10 SDK
+- Node.js v18+
 
-### 1. Booting the Backend API Environment
-First, restore NuGet dependencies and ensure your local database is migrated to the latest schema:
-```bash
-dotnet restore
-dotnet ef database update --project Persistence --startup-project WebApi
-```
-Start the Kestrel Server:
+### Backend
 ```bash
 cd WebApi
+dotnet ef database update --project ../Persistence --startup-project .
 dotnet run
 ```
-*The REST API spins up at `http://localhost:5034`. Test your endpoints visually via the automatic Swagger UI at `http://localhost:5034/swagger`.*
+API runs at http://localhost:5000. Swagger at http://localhost:5000/swagger.
 
-### 2. Booting the Web Dashboard (React SPA)
-In a fresh terminal, deploy the Buyer/Admin dashboard:
+### Frontend (development)
 ```bash
 cd WebApi/ClientApp
-npm install
-npm start
+NODE_OPTIONS=--openssl-legacy-provider npm install
+NODE_OPTIONS=--openssl-legacy-provider npm start
 ```
-*The React application will ignite at `http://localhost:44391` (or 3000), interacting seamlessly with your .NET backend via configured endpoints.*
+React dev server runs at http://localhost:44391.
 
-### 3. Booting the Mobile App (Expo)
-To test the Volunteer flow interactively on your device, you **must substitute your physical LAN IP** (e.g. `192.168.x.x`) inward for your phone to route properly:
+### Production build
 ```bash
-cd NadenaApp
-npm install
-
-# Write your network IP to the environment
-echo "EXPO_PUBLIC_API_URL=http://<YOUR_LAN_IP>:5034/api/v1" > .env
-
-# Start the metro bundler
-npm run start
+cd WebApi/ClientApp
+NODE_OPTIONS=--openssl-legacy-provider npm run build
+cd ..
+dotnet publish -c Release -o /var/www/nadena
+dotnet /var/www/nadena/WebApi.dll
 ```
-*Simply scan the generated QR Code using your device's camera mapping into Expo Go.*
 
 ---
 
-## Deployment Notes
-* **Secrets Management**: Local development runs via mock Stripe strings. In production, ensure you supply true tokens mapping to `StripeWebhookSecret` and `SmtpUser` inside `appsettings.json` or system variables.
-* **Linux Deployments**: A bespoke `deploy.sh` script ships with this repository. It natively handles transpiling React, publishing the .NET build, establishing `nadena.service` locally on `systemd`, and locking down an Nginx reverse proxy via `nadena.conf`.
+## Configuration
+
+Copy appsettings.example.json to appsettings.Development.json and fill in:
+
+```json
+{
+  "NadenaSettings": {
+    "GoogleClientId": "",
+    "GoogleClientSecret": "",
+    "GoogleRedirectUri": "http://localhost:5000/api/v1/oauth/callback",
+    "TokenEncryptionKey": "",
+    "StripeWebhookSecret": "",
+    "StripeSecretKey": "",
+    "PayPalClientId": "",
+    "PayPalClientSecret": "",
+    "PayPalMode": "sandbox",
+    "FrontendUrl": "http://localhost:3000",
+    "ContributorSharePercent": 0,
+    "ModeSharePercent": 0,
+    "NadenaSharePercent": 0
+  }
+}
+```
+
+Generate the encryption key:
+```bash
+openssl rand -base64 32
+```
+
+---
+
+## Contributor submission flow
+
+1. Contributor authorizes Google Drive (read-only) once via /upload
+2. Requests a Google Takeout export -- one tap to a pre-configured URL
+3. Google places the ZIP in their Drive (hours later)
+4. DrivePollingService detects it automatically every 30 minutes
+5. ZIP is validated, anonymized, forwarded to the buyer endpoint, and deleted
+6. Contributor wallet is credited
+
+Manual upload via phone browser is also supported at /upload without OAuth.
+
+---
+
+## Hard rules
+
+- No AutoMapper -- .NET 10 reflection incompatibility
+- JWT secret must appear in both appsettings.json and appsettings.Development.json
+- No video titles, channel names, or URLs stored at any point
+- Raw Takeout ZIPs deleted from memory after processing -- never written to disk
+- Revenue split always reads from IConfiguration, never hardcoded

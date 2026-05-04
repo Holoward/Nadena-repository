@@ -4,15 +4,24 @@ using Application.Interfaces;
 
 namespace Persistence.Services;
 
+/// <summary>
+/// Forwards anonymized contributor payloads directly to the buyer's configured delivery endpoint. Nothing is stored on Nadena's servers — raw data is deleted immediately after processing.
+/// </summary>
 public class DataDeliveryService : IDataDeliveryService
 {
     private readonly IHttpClientFactory _httpClientFactory;
 
+    /// <summary>
+    /// Creates the service with the HTTP client factory used for buyer endpoint delivery.
+    /// </summary>
     public DataDeliveryService(IHttpClientFactory httpClientFactory)
     {
         _httpClientFactory = httpClientFactory;
     }
 
+    /// <summary>
+    /// Sends an anonymized payload to the buyer's delivery endpoint and reports whether delivery succeeded.
+    /// </summary>
     public async Task<DeliveryResult> ForwardAsync(
         AnonymizedTakeoutPayload payload,
         string deliveryEndpoint,

@@ -10,6 +10,9 @@ namespace WebApi.Controllers.v1;
 [ApiVersion("1.0")]
 [ApiController]
 [Route("api/v{version:apiVersion}/[controller]")]
+/// <summary>
+/// Handles Stripe payment webhooks. On successful payment, creates a purchase record, generates a license PDF, emails the buyer, and triggers the revenue split.
+/// </summary>
 public class WebhookController : ControllerBase
 {
     private readonly IConfiguration _configuration;
@@ -22,6 +25,9 @@ public class WebhookController : ControllerBase
     private readonly IEmailService _emailService;
     private readonly IMediator _mediator;
 
+    /// <summary>
+    /// Creates the controller with payment, dataset, buyer, email, PDF, mediator, and logging dependencies.
+    /// </summary>
     public WebhookController(
         IConfiguration configuration,
         IRepositoryAsync<DatasetPurchase> purchaseRepository,
@@ -46,6 +52,9 @@ public class WebhookController : ControllerBase
 
     [HttpPost("stripe")]
     [Consumes("application/json")]
+    /// <summary>
+    /// Verifies Stripe's webhook signature and processes completed checkout sessions.
+    /// </summary>
     public async Task<IActionResult> StripeWebhook()
     {
         var httpContext = _httpContextAccessor.HttpContext;
