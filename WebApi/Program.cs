@@ -224,7 +224,8 @@ static async Task SeedIdentityDataAsync(IServiceProvider services, IConfiguratio
     }
 
     var adminEmail = configuration["NadenaSettings:AdminEmail"] ?? "admin@nadena.com";
-    const string adminPassword = "AdminPassword123!";
+    var adminPassword = configuration["NadenaSettings:AdminSeedPassword"]
+        ?? throw new InvalidOperationException("NadenaSettings:AdminSeedPassword must be set in configuration. See appsettings.example.json.");
 
     var adminUser = await userManager.FindByEmailAsync(adminEmail);
     if (adminUser == null)

@@ -26,6 +26,7 @@ public class NadenaE2ETests
         Environment.SetEnvironmentVariable("UseInMemoryDatabase", "true");
         Environment.SetEnvironmentVariable("ConnectionStrings__DefaultConnection", "Host=localhost;Database=Test;");
         Environment.SetEnvironmentVariable("ConnectionStrings__IdentityConnection", "Host=localhost;Database=TestId;");
+        Environment.SetEnvironmentVariable("NadenaSettings__AdminSeedPassword", "Test_Admin_Pass_1!");
 
         _factory = factory;
         
@@ -199,7 +200,7 @@ public class NadenaE2ETests
     public async Task LoginAdmin_ShouldReturnJwtToken()
     {
         var email = "admin@nadena.com";
-        var password = "AdminPassword123!";
+        var password = "Test_Admin_Pass_1!";
 
         var response = await _client.PostAsJsonAsync("/api/v1/Auth/login", new
         {
@@ -213,7 +214,7 @@ public class NadenaE2ETests
     public async Task AdminUpdateDataPool_ShouldReturn200()
     {
         var email = "admin@nadena.com";
-        var password = "AdminPassword123!";
+        var password = "Test_Admin_Pass_1!";
         var loginResponse = await _client.PostAsJsonAsync("/api/v1/Auth/login", new { email = email, password = password });
         
         var content = await loginResponse.Content.ReadAsStringAsync();

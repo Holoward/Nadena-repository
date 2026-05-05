@@ -2,7 +2,7 @@
 
 Consent-based behavioral data marketplace. Contributors export their YouTube, Spotify, and Netflix activity via Google Takeout and choose to license anonymized behavioral records to researchers and AI companies. The platform handles consent documentation, validation, anonymization, delivery, and payment splitting automatically.
 
-**nadena.tech** -- david@nadena.tech
+**nadena.tech**
 
 ---
 
