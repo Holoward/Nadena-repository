@@ -33,20 +33,23 @@ namespace WebApi.Controllers.v1;
 public class DataContributorController : ControllerBase
 {
     private readonly ISender _mediator;
-    private readonly ApplicationDbContext _context;
+    private readonly ApplicationDbContext _behavioralContext;
+    private readonly NadenaIdentityDbContext _identityContext;
     private readonly IPaymentService _paymentService;
     private readonly IAuditLogService _auditLogService;
     private readonly UserManager<ApplicationUser> _userManager;
 
     public DataContributorController(
         ISender mediator, 
-        ApplicationDbContext context, 
+        ApplicationDbContext behavioralContext, 
+        NadenaIdentityDbContext identityContext,
         IPaymentService paymentService, 
         IAuditLogService auditLogService,
         UserManager<ApplicationUser> userManager)
     {
         _mediator = mediator;
-        _context = context;
+        _behavioralContext = behavioralContext;
+        _identityContext = identityContext;
         _paymentService = paymentService;
         _auditLogService = auditLogService;
         _userManager = userManager;
@@ -64,7 +67,7 @@ public class DataContributorController : ControllerBase
             return Unauthorized(new { message = "User not authenticated" });
         }
 
-        var volunteer = await _context.Volunteers.AsNoTracking().FirstOrDefaultAsync(v => v.UserId == userId);
+        var volunteer = await _identityContext.Volunteers.AsNoTracking().FirstOrDefaultAsync(v => v.UserId == userId);
         if (volunteer == null)
         {
             return NotFound(new { message = "Data Contributor not found" });
@@ -85,7 +88,7 @@ public class DataContributorController : ControllerBase
             return Unauthorized(new { message = "User not authenticated" });
         }
 
-        var volunteer = await _context.Volunteers.FirstOrDefaultAsync(v => v.UserId == userId);
+        var volunteer = await _identityContext.Volunteers.FirstOrDefaultAsync(v => v.UserId == userId);
         if (volunteer == null)
         {
             return NotFound(new { message = "Data Contributor not found" });
@@ -107,7 +110,7 @@ public class DataContributorController : ControllerBase
         };
 
         volunteer.Notes = JsonSerializer.Serialize(existing);
-        await _context.SaveChangesAsync();
+        await _identityContext.SaveChangesAsync();
 
         return Ok(new { message = "Data sources updated.", data = volunteer });
     }
@@ -126,7 +129,7 @@ public class DataContributorController : ControllerBase
             return Unauthorized(new { message = "User not authenticated" });
         }
 
-        var uploads = await _context.AuditLogs.AsNoTracking()
+        var uploads = await _identityContext.AuditLogs.AsNoTracking()
             .Where(a => a.UserId == userId && a.Action == "FileUploaded" && a.Success)
             .OrderByDescending(a => a.Timestamp)
             .Take(limit)
@@ -153,13 +156,13 @@ public class DataContributorController : ControllerBase
             return Unauthorized(new { message = "User not authenticated" });
         }
 
-        var volunteer = await _context.Volunteers.AsNoTracking().FirstOrDefaultAsync(v => v.UserId == userId);
+        var volunteer = await _identityContext.Volunteers.AsNoTracking().FirstOrDefaultAsync(v => v.UserId == userId);
         if (volunteer == null)
         {
             return NotFound(new { message = "Data Contributor not found" });
         }
 
-        var payments = await _context.VolunteerPayments.AsNoTracking()
+        var payments = await _identityContext.VolunteerPayments.AsNoTracking()
             .Where(p => p.VolunteerId == volunteer.Id)
             .OrderByDescending(p => p.PaidAt ?? p.Created)
             .Take(100)
@@ -198,7 +201,7 @@ public class DataContributorController : ControllerBase
             return Unauthorized(new { message = "User not authenticated" });
         }
 
-        var wallet = await _context.Wallets.AsNoTracking().FirstOrDefaultAsync(w => w.OwnerId == userId);
+        var wallet = await _identityContext.Wallets.AsNoTracking().FirstOrDefaultAsync(w => w.OwnerId == userId);
         if (wallet == null)
         {
             return Ok(new { data = new { balance = 0m, pendingBalance = 0m, currency = "USD" } });
@@ -218,13 +221,13 @@ public class DataContributorController : ControllerBase
             return Unauthorized(new { message = "User not authenticated" });
         }
 
-        var wallet = await _context.Wallets.AsNoTracking().FirstOrDefaultAsync(w => w.OwnerId == userId);
+        var wallet = await _identityContext.Wallets.AsNoTracking().FirstOrDefaultAsync(w => w.OwnerId == userId);
         if (wallet == null)
         {
             return Ok(new { data = Array.Empty<object>() });
         }
 
-        var transactions = await _context.Transactions.AsNoTracking()
+        var transactions = await _identityContext.Transactions.AsNoTracking()
             .Where(t => t.FromWalletId == wallet.Id || t.ToWalletId == wallet.Id)
             .OrderByDescending(t => t.CreatedAt)
             .ToListAsync();
@@ -243,10 +246,10 @@ public class DataContributorController : ControllerBase
             return Unauthorized(new { message = "User not authenticated" });
         }
 
-        var wallet = await _context.Wallets.AsNoTracking().FirstOrDefaultAsync(w => w.OwnerId == userId);
+        var wallet = await _identityContext.Wallets.AsNoTracking().FirstOrDefaultAsync(w => w.OwnerId == userId);
         var transaction = wallet == null
             ? null
-            : await _context.Transactions.AsNoTracking().FirstOrDefaultAsync(t => t.Id == transactionId && t.ToWalletId == wallet.Id);
+            : await _identityContext.Transactions.AsNoTracking().FirstOrDefaultAsync(t => t.Id == transactionId && t.ToWalletId == wallet.Id);
 
         if (transaction == null)
         {
@@ -356,7 +359,7 @@ public class DataContributorController : ControllerBase
         }
 
         var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-        var volunteer = await _context.Volunteers.FirstOrDefaultAsync(v => v.Id == id);
+        var volunteer = await _identityContext.Volunteers.FirstOrDefaultAsync(v => v.Id == id);
         if (volunteer == null)
         {
             return NotFound(new { message = "Data Contributor not found" });
@@ -424,7 +427,7 @@ public class DataContributorController : ControllerBase
         }
 
         var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-        var volunteer = await _context.Volunteers.FirstOrDefaultAsync(v => v.UserId == userId);
+        var volunteer = await _identityContext.Volunteers.FirstOrDefaultAsync(v => v.UserId == userId);
         if (volunteer == null)
         {
             return NotFound(new { message = "Data Contributor not found" });
@@ -467,11 +470,11 @@ public class DataContributorController : ControllerBase
         }
 
         // Delete any existing email for this contributor
-        var existing = await _context.ContributorEmails
+        var existing = await _identityContext.ContributorEmails
             .FirstOrDefaultAsync(e => e.ContributorId == userId);
         if (existing != null)
         {
-            _context.ContributorEmails.Remove(existing);
+            _identityContext.ContributorEmails.Remove(existing);
         }
 
         // Create new email record
@@ -481,8 +484,8 @@ public class DataContributorController : ControllerBase
             Email = request.Email.Trim(),
             CreatedAt = DateTime.UtcNow
         };
-        _context.ContributorEmails.Add(contributorEmail);
-        await _context.SaveChangesAsync();
+        _identityContext.ContributorEmails.Add(contributorEmail);
+        await _identityContext.SaveChangesAsync();
 
         return Ok(new { message = "Email saved successfully" });
     }
@@ -499,15 +502,15 @@ public class DataContributorController : ControllerBase
             return Unauthorized(new { message = "User not authenticated" });
         }
 
-        var existing = await _context.ContributorEmails
+        var existing = await _identityContext.ContributorEmails
             .FirstOrDefaultAsync(e => e.ContributorId == userId);
         if (existing == null)
         {
             return NotFound(new { message = "No email found to delete" });
         }
 
-        _context.ContributorEmails.Remove(existing);
-        await _context.SaveChangesAsync();
+        _identityContext.ContributorEmails.Remove(existing);
+        await _identityContext.SaveChangesAsync();
 
         return Ok(new { message = "Email deleted successfully" });
     }
@@ -520,14 +523,14 @@ public class DataContributorController : ControllerBase
     {
         var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
 
-        var volunteer = await _context.Volunteers.FirstOrDefaultAsync(v => v.UserId == userId);
+        var volunteer = await _identityContext.Volunteers.FirstOrDefaultAsync(v => v.UserId == userId);
         if (volunteer == null)
         {
             return NotFound(new { message = "Data Contributor not found" });
         }
 
         volunteer.PushToken = request.PushToken;
-        await _context.SaveChangesAsync();
+        await _identityContext.SaveChangesAsync();
 
         return Ok(new { message = "Push token updated successfully" });
     }
@@ -544,7 +547,6 @@ public class DataContributorController : ControllerBase
             return Unauthorized(new { message = "User not authenticated" });
         }
 
-        using var transaction = await _context.Database.BeginTransactionAsync();
         try
         {
             if (!Guid.TryParse(userId, out var userGuid))
@@ -553,25 +555,25 @@ public class DataContributorController : ControllerBase
             }
 
             // 1. Delete WatchEvents
-            var watchEvents = await _context.WatchEvents
+            var watchEvents = await _behavioralContext.WatchEvents
                 .Where(w => w.ContributorId == userGuid)
                 .ToListAsync();
-            _context.WatchEvents.RemoveRange(watchEvents);
+            _behavioralContext.WatchEvents.RemoveRange(watchEvents);
 
             // 2. Delete Donation
-            var donation = await _context.Donations
+            var donation = await _behavioralContext.Donations
                 .FirstOrDefaultAsync(d => d.ContributorId == userId);
             if (donation != null)
             {
-                _context.Donations.Remove(donation);
+                _behavioralContext.Donations.Remove(donation);
             }
 
             // 3. Delete ContributorEmail
-            var email = await _context.ContributorEmails
+            var email = await _identityContext.ContributorEmails
                 .FirstOrDefaultAsync(e => e.ContributorId == userId);
             if (email != null)
             {
-                _context.ContributorEmails.Remove(email);
+                _identityContext.ContributorEmails.Remove(email);
             }
 
             // 4. Anonymize and disable ApplicationUser
@@ -588,13 +590,15 @@ public class DataContributorController : ControllerBase
                 await _userManager.UpdateAsync(user);
 
                 // Invalidate all sessions
-                var sessions = await _context.UserSessions
+                var sessions = await _identityContext.UserSessions
                     .Where(s => s.UserId == userId)
                     .ToListAsync();
                 foreach (var session in sessions)
                 {
                     session.ExpiresAt = DateTime.UtcNow;
                 }
+
+                await _identityContext.SaveChangesAsync();
             }
 
             // 5. Log audit entry
@@ -606,14 +610,13 @@ public class DataContributorController : ControllerBase
                 userId: userId,
                 newValues: "{\"action\":\"User requested full data deletion\"}");
 
-            await _context.SaveChangesAsync();
-            await transaction.CommitAsync();
+            await _behavioralContext.SaveChangesAsync();
+            await _identityContext.SaveChangesAsync();
 
             return Ok(new { message = "Your data has been deleted." });
         }
         catch (Exception ex)
         {
-            await transaction.RollbackAsync();
             await _auditLogService.LogAsync(
                 action: "DataDeletion",
                 entityType: "User",
@@ -637,7 +640,7 @@ public class DataContributorController : ControllerBase
             return Unauthorized(new { message = "User not authenticated" });
         }
 
-        var volunteer = await _context.Volunteers.FirstOrDefaultAsync(v => v.Id == id);
+        var volunteer = await _identityContext.Volunteers.FirstOrDefaultAsync(v => v.Id == id);
         if (volunteer == null)
         {
             return NotFound(new { message = "Data Contributor not found" });
@@ -658,8 +661,8 @@ public class DataContributorController : ControllerBase
             RequestedAt = DateTime.UtcNow
         };
 
-        _context.DeletionRequests.Add(deletionRequest);
-        await _context.SaveChangesAsync();
+        _identityContext.DeletionRequests.Add(deletionRequest);
+        await _identityContext.SaveChangesAsync();
         await _auditLogService.LogAsync("DataDeletionRequested", "DeletionRequest", deletionRequest.Id.ToString(), true, userId);
         return Ok(new { message = "Deletion request submitted for admin review.", data = deletionRequest });
     }
@@ -677,7 +680,7 @@ public class DataContributorController : ControllerBase
             return Unauthorized(new { message = "User not authenticated" });
         }
 
-        var volunteer = await _context.Volunteers.FirstOrDefaultAsync(v => v.Id == id);
+        var volunteer = await _identityContext.Volunteers.FirstOrDefaultAsync(v => v.Id == id);
         if (volunteer == null)
         {
             return NotFound(new { message = "Data Contributor not found" });
@@ -708,13 +711,13 @@ public class DataContributorController : ControllerBase
             return Unauthorized(new { message = "User not authenticated" });
         }
 
-        var wallet = await _context.Wallets.AsNoTracking().FirstOrDefaultAsync(w => w.OwnerId == userId);
+        var wallet = await _identityContext.Wallets.AsNoTracking().FirstOrDefaultAsync(w => w.OwnerId == userId);
         if (wallet == null)
         {
             return File(Encoding.UTF8.GetBytes("date,type,status,amount,currency,reference\n"), "text/csv", "earnings-history.csv");
         }
 
-        var transactions = await _context.Transactions.AsNoTracking()
+        var transactions = await _identityContext.Transactions.AsNoTracking()
             .Where(t => t.ToWalletId == wallet.Id && t.Type == "ContributorPayout")
             .OrderByDescending(t => t.CreatedAt)
             .ToListAsync();
@@ -757,7 +760,7 @@ public class DataContributorController : ControllerBase
             return Unauthorized(new { message = "User not authenticated" });
         }
 
-        var volunteer = await _context.Volunteers.FirstOrDefaultAsync(v => v.UserId == userId);
+        var volunteer = await _identityContext.Volunteers.FirstOrDefaultAsync(v => v.UserId == userId);
         if (volunteer == null)
         {
             return NotFound(new { message = "Data Contributor not found" });

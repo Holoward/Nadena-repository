@@ -6,10 +6,12 @@ using Application.Features.Buyers.Queries.GetBuyerByUserId;
 using Application.Interfaces;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Persistence.Context;
+using Persistence.Models;
 using System.Text.Json;
 
 namespace WebApi.Controllers.v1;
@@ -24,27 +26,33 @@ public class DataClientController : ControllerBase
     private readonly ISender _mediator;
     private readonly ICurrentUserService _currentUserService;
     private readonly IPaymentService _paymentService;
-    private readonly ApplicationDbContext _dbContext;
+    private readonly ApplicationDbContext _behavioralContext;
+    private readonly NadenaIdentityDbContext _identityContext;
     private readonly IWebHostEnvironment _environment;
     private readonly ILicensePdfService _licensePdfService;
     private readonly IEmailService _emailService;
+    private readonly UserManager<ApplicationUser> _userManager;
 
     public DataClientController(
         ISender mediator,
         ICurrentUserService currentUserService,
         IPaymentService paymentService,
-        ApplicationDbContext dbContext,
+        ApplicationDbContext behavioralContext,
+        NadenaIdentityDbContext identityContext,
         IWebHostEnvironment environment,
         ILicensePdfService licensePdfService,
-        IEmailService emailService)
+        IEmailService emailService,
+        UserManager<ApplicationUser> userManager)
     {
         _mediator = mediator;
         _currentUserService = currentUserService;
         _paymentService = paymentService;
-        _dbContext = dbContext;
+        _behavioralContext = behavioralContext;
+        _identityContext = identityContext;
         _environment = environment;
         _licensePdfService = licensePdfService;
         _emailService = emailService;
+        _userManager = userManager;
     }
 
     // GET: api/v1/DataClient
@@ -99,7 +107,7 @@ public class DataClientController : ControllerBase
     {
         var buyerUserId = _currentUserService.GetCurrentUserId();
         var idempotencyKey = Request.Headers["Idempotency-Key"].FirstOrDefault();
-        var user = await _dbContext.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == buyerUserId);
+        var user = await _userManager.FindByIdAsync(buyerUserId);
 
         if (string.IsNullOrWhiteSpace(idempotencyKey))
         {
@@ -137,7 +145,7 @@ public class DataClientController : ControllerBase
     public async Task<IActionResult> Wallet()
     {
         var buyerUserId = _currentUserService.GetCurrentUserId();
-        var wallet = await _dbContext.Wallets.AsNoTracking().FirstOrDefaultAsync(w => w.OwnerId == buyerUserId);
+        var wallet = await _identityContext.Wallets.AsNoTracking().FirstOrDefaultAsync(w => w.OwnerId == buyerUserId);
         if (wallet == null)
         {
             return Ok(new { data = new { balance = 0m, pendingBalance = 0m, currency = "USD" } });
@@ -151,13 +159,13 @@ public class DataClientController : ControllerBase
     public async Task<IActionResult> Transactions()
     {
         var buyerUserId = _currentUserService.GetCurrentUserId();
-        var wallet = await _dbContext.Wallets.AsNoTracking().FirstOrDefaultAsync(w => w.OwnerId == buyerUserId);
+        var wallet = await _identityContext.Wallets.AsNoTracking().FirstOrDefaultAsync(w => w.OwnerId == buyerUserId);
         if (wallet == null)
         {
             return Ok(new { data = Array.Empty<object>() });
         }
 
-        var transactions = await _dbContext.Transactions.AsNoTracking()
+        var transactions = await _identityContext.Transactions.AsNoTracking()
             .Where(t => t.FromWalletId == wallet.Id || t.ToWalletId == wallet.Id)
             .OrderByDescending(t => t.CreatedAt)
             .ToListAsync();
@@ -176,7 +184,7 @@ public class DataClientController : ControllerBase
             return BadRequest(new { message = "Idempotency-Key header is required." });
         }
 
-        var user = await _dbContext.Users.FirstOrDefaultAsync(entry => entry.Id == buyerUserId);
+        var user = await _userManager.FindByIdAsync(buyerUserId);
         if (user == null)
         {
             return Unauthorized();
@@ -226,11 +234,11 @@ public class DataClientController : ControllerBase
             })
         };
 
-        _dbContext.DatasetPurchases.Add(purchase);
+        _behavioralContext.DatasetPurchases.Add(purchase);
 
         if (request.PurchaseType != "OneTime")
         {
-            _dbContext.DatasetSubscriptions.Add(new Domain.Entities.DatasetSubscription
+            _behavioralContext.DatasetSubscriptions.Add(new Domain.Entities.DatasetSubscription
             {
                 DatasetId = datasetId,
                 BuyerId = Guid.Parse(buyerUserId),
@@ -245,7 +253,7 @@ public class DataClientController : ControllerBase
         }
 
         await WriteDatasetFileAsync(datasetId, request);
-        await _dbContext.SaveChangesAsync();
+        await _behavioralContext.SaveChangesAsync();
 
         return Ok(new
         {
@@ -264,7 +272,7 @@ public class DataClientController : ControllerBase
     [Authorize(Roles = "Data Client")]
     public async Task<IActionResult> RequestCustomQuote([FromBody] CustomQuoteRequest request)
     {
-        var user = await _dbContext.Users.AsNoTracking().FirstOrDefaultAsync(entry => entry.Id == _currentUserService.GetCurrentUserId());
+        var user = await _userManager.FindByIdAsync(_currentUserService.GetCurrentUserId() ?? string.Empty);
         if (user == null)
         {
             return Unauthorized();
@@ -279,7 +287,7 @@ public class DataClientController : ControllerBase
     public async Task<IActionResult> MyDatasets()
     {
         var buyerUserId = _currentUserService.GetCurrentUserId();
-        var purchases = await _dbContext.DatasetPurchases.AsNoTracking()
+        var purchases = await _behavioralContext.DatasetPurchases.AsNoTracking()
             .Where(purchase => purchase.BuyerId == Guid.Parse(buyerUserId))
             .OrderByDescending(purchase => purchase.PurchasedAt)
             .ToListAsync();
@@ -292,13 +300,13 @@ public class DataClientController : ControllerBase
     public async Task<IActionResult> CancelSubscription(Guid purchaseId)
     {
         var buyerUserId = _currentUserService.GetCurrentUserId();
-        var purchase = await _dbContext.DatasetPurchases.FirstOrDefaultAsync(entry => entry.Id == purchaseId && entry.BuyerId == Guid.Parse(buyerUserId));
+        var purchase = await _behavioralContext.DatasetPurchases.FirstOrDefaultAsync(entry => entry.Id == purchaseId && entry.BuyerId == Guid.Parse(buyerUserId));
         if (purchase == null)
         {
             return NotFound(new { message = "Purchase not found." });
         }
 
-        var subscription = await _dbContext.DatasetSubscriptions.FirstOrDefaultAsync(entry => entry.DatasetId == purchase.DatasetId && entry.BuyerId == purchase.BuyerId && entry.IsActive);
+        var subscription = await _behavioralContext.DatasetSubscriptions.FirstOrDefaultAsync(entry => entry.DatasetId == purchase.DatasetId && entry.BuyerId == purchase.BuyerId && entry.IsActive);
         if (subscription == null)
         {
             return BadRequest(new { message = "No active subscription found." });
@@ -306,7 +314,7 @@ public class DataClientController : ControllerBase
 
         subscription.IsActive = false;
         purchase.Status = "Cancelled";
-        await _dbContext.SaveChangesAsync();
+        await _behavioralContext.SaveChangesAsync();
         return Ok(new { message = "Subscription cancelled." });
     }
 
@@ -315,15 +323,31 @@ public class DataClientController : ControllerBase
     public async Task<IActionResult> Invoice(Guid purchaseId)
     {
         var buyerUserId = _currentUserService.GetCurrentUserId();
-        var purchase = await _dbContext.DatasetPurchases.AsNoTracking().FirstOrDefaultAsync(entry => entry.Id == purchaseId && entry.BuyerId == Guid.Parse(buyerUserId));
+        var purchase = await _behavioralContext.DatasetPurchases.AsNoTracking().FirstOrDefaultAsync(entry => entry.Id == purchaseId && entry.BuyerId == Guid.Parse(buyerUserId));
         if (purchase == null)
         {
             return NotFound(new { message = "Purchase not found." });
         }
 
-        var user = await _dbContext.Users.AsNoTracking().FirstOrDefaultAsync(entry => entry.Id == buyerUserId);
+        var user = await _userManager.FindByIdAsync(buyerUserId);
         var pdf = _licensePdfService.GenerateLicensePdf(user?.FullName ?? "Data Client", user?.CompanyName ?? string.Empty, 0, purchase.PurchasedAt);
         return File(pdf, "application/pdf", $"{purchase.InvoiceNumber}.pdf");
+    }
+
+    [HttpPut("my-datasets/{purchaseId:guid}/delivery-endpoint")]
+    [Authorize(Roles = "Data Client")]
+    public async Task<IActionResult> UpdateDeliveryEndpoint(Guid purchaseId, [FromBody] UpdateDeliveryEndpointRequest request)
+    {
+        var buyerUserId = _currentUserService.GetCurrentUserId();
+        var purchase = await _behavioralContext.DatasetPurchases.FirstOrDefaultAsync(entry => entry.Id == purchaseId && entry.BuyerId == Guid.Parse(buyerUserId));
+        if (purchase == null)
+        {
+            return NotFound(new { message = "Purchase not found." });
+        }
+
+        purchase.DeliveryEndpoint = request.DeliveryEndpoint;
+        await _behavioralContext.SaveChangesAsync();
+        return Ok(new { message = "Delivery endpoint updated.", deliveryEndpoint = purchase.DeliveryEndpoint });
     }
 
     [HttpPost("my-datasets/{purchaseId:guid}/share")]
@@ -331,7 +355,7 @@ public class DataClientController : ControllerBase
     public async Task<IActionResult> ShareDataset(Guid purchaseId, [FromBody] ShareDatasetRequest request)
     {
         var buyerUserId = _currentUserService.GetCurrentUserId();
-        var purchase = await _dbContext.DatasetPurchases.AsNoTracking().FirstOrDefaultAsync(entry => entry.Id == purchaseId && entry.BuyerId == Guid.Parse(buyerUserId));
+        var purchase = await _behavioralContext.DatasetPurchases.AsNoTracking().FirstOrDefaultAsync(entry => entry.Id == purchaseId && entry.BuyerId == Guid.Parse(buyerUserId));
         if (purchase == null)
         {
             return NotFound(new { message = "Purchase not found." });
@@ -346,8 +370,8 @@ public class DataClientController : ControllerBase
             ExpiresAt = DateTime.UtcNow.AddDays(30)
         };
 
-        _dbContext.DatasetAccessGrants.Add(grant);
-        await _dbContext.SaveChangesAsync();
+        _behavioralContext.DatasetAccessGrants.Add(grant);
+        await _behavioralContext.SaveChangesAsync();
         return Ok(new { message = "Dataset access granted.", data = grant });
     }
 
@@ -420,4 +444,9 @@ public class CustomQuoteRequest
 {
     public string DatasetName { get; set; } = string.Empty;
     public int RecordCount { get; set; }
+}
+
+public class UpdateDeliveryEndpointRequest
+{
+    public string? DeliveryEndpoint { get; set; }
 }

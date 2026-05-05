@@ -27,9 +27,8 @@ namespace WebApi.Controllers.v1;
 public class VolunteerController : ControllerBase
 {
     private readonly ISender _mediator;
-    private readonly ApplicationDbContext _context;
-
-    public VolunteerController(ISender mediator, ApplicationDbContext context)
+    private readonly NadenaIdentityDbContext _context;
+    public VolunteerController(ISender mediator, NadenaIdentityDbContext context)
     {
         _mediator = mediator;
         _context = context;

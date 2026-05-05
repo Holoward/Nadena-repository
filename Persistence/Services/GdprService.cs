@@ -10,16 +10,19 @@ namespace Persistence.Services;
 
 public class GdprService : IGdprService
 {
-    private readonly ApplicationDbContext _context;
+    private readonly ApplicationDbContext _behavioralContext;
+    private readonly NadenaIdentityDbContext _identityContext;
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly IAuditLogService _auditLogService;
 
     public GdprService(
-        ApplicationDbContext context,
+        ApplicationDbContext behavioralContext,
+        NadenaIdentityDbContext identityContext,
         UserManager<ApplicationUser> userManager,
         IAuditLogService auditLogService)
     {
-        _context = context;
+        _behavioralContext = behavioralContext;
+        _identityContext = identityContext;
         _userManager = userManager;
         _auditLogService = auditLogService;
     }
@@ -27,7 +30,7 @@ public class GdprService : IGdprService
     public async Task<VolunteerDataExportDto> ExportVolunteerDataAsync(int volunteerId, string userId, CancellationToken cancellationToken = default)
     {
         // Verify ownership
-        var volunteer = await _context.Volunteers.FindAsync(new object[] { volunteerId }, cancellationToken);
+        var volunteer = await _identityContext.Volunteers.FindAsync(new object[] { volunteerId }, cancellationToken);
         if (volunteer == null || volunteer.UserId != userId)
         {
             throw new UnauthorizedAccessException("You can only export your own data");
@@ -41,13 +44,20 @@ public class GdprService : IGdprService
         }
 
         // Get all ConsentRecord records
-        var consentRecords = await _context.ConsentRecords
+        var consentRecords = await _identityContext.ConsentRecords
             .Where(c => c.UserId == userId)
             .ToListAsync(cancellationToken);
 
         // Get payment history
-        var payments = await _context.VolunteerPayments
+        var payments = await _identityContext.VolunteerPayments
             .Where(p => p.VolunteerId == volunteerId)
+            .ToListAsync(cancellationToken);
+
+        var contributorGuid = Guid.TryParse(userId, out var parsedUserId) ? parsedUserId : Guid.Empty;
+        var watchEvents = await _behavioralContext.WatchEvents
+            .Where(w => w.ContributorId == contributorGuid)
+            .AsNoTracking()
+            .OrderBy(w => w.WatchedAt)
             .ToListAsync(cancellationToken);
 
         // Build the export DTO
@@ -59,7 +69,18 @@ public class GdprService : IGdprService
             PayPalEmail = volunteer.PayPalEmail,
             Status = volunteer.Status.ToString(),
             CreatedAt = volunteer.Created,
-            YoutubeComments = new List<YoutubeCommentExportDto>(),
+            WatchEvents = watchEvents.Select(w => new WatchEventExportDto
+            {
+                Category = w.Category,
+                WatchedAt = w.WatchedAt,
+                HourOfDay = w.HourOfDay,
+                DayOfWeek = w.DayOfWeek,
+                Month = w.Month,
+                Year = w.Year,
+                SessionId = w.SessionId,
+                PositionInSession = w.PositionInSession,
+                IsRepeat = w.IsRepeat
+            }).ToList(),
             ConsentRecords = consentRecords.Select(c => new ConsentRecordExportDto
             {
                 ConsentType = c.ConsentText,
@@ -81,17 +102,23 @@ public class GdprService : IGdprService
     public async Task<bool> DeleteVolunteerDataAsync(int volunteerId, string userId, CancellationToken cancellationToken = default)
     {
         // Verify ownership
-        var volunteer = await _context.Volunteers.FindAsync(new object[] { volunteerId }, cancellationToken);
+        var volunteer = await _identityContext.Volunteers.FindAsync(new object[] { volunteerId }, cancellationToken);
         if (volunteer == null || volunteer.UserId != userId)
         {
             throw new UnauthorizedAccessException("You can only delete your own data");
         }
 
         // Delete all SpotifyListeningRecord records
-        var spotifyRecords = await _context.SpotifyListeningRecords
+        var spotifyRecords = await _behavioralContext.SpotifyListeningRecords
             .Where(s => s.VolunteerId == volunteerId)
             .ToListAsync(cancellationToken);
-        _context.SpotifyListeningRecords.RemoveRange(spotifyRecords);
+        _behavioralContext.SpotifyListeningRecords.RemoveRange(spotifyRecords);
+
+        var contributorGuid = Guid.TryParse(userId, out var parsedUserId) ? parsedUserId : Guid.Empty;
+        var watchEvents = await _behavioralContext.WatchEvents
+            .Where(w => w.ContributorId == contributorGuid)
+            .ToListAsync(cancellationToken);
+        _behavioralContext.WatchEvents.RemoveRange(watchEvents);
 
         // Anonymize the Volunteer record
         volunteer.Status = VolunteerStatus.Deleted;
@@ -103,9 +130,10 @@ public class GdprService : IGdprService
             entityId: volunteerId.ToString(),
             success: true,
             userId: userId,
-            newValues: $"{{\"Status\":\"{VolunteerStatus.Deleted}\",\"DeletedSpotifyRecordsCount\":{spotifyRecords.Count}}}");
+            newValues: $"{{\"Status\":\"{VolunteerStatus.Deleted}\",\"DeletedSpotifyRecordsCount\":{spotifyRecords.Count},\"DeletedWatchEventsCount\":{watchEvents.Count}}}");
 
-        await _context.SaveChangesAsync(cancellationToken);
+        await _identityContext.SaveChangesAsync(cancellationToken);
+        await _behavioralContext.SaveChangesAsync(cancellationToken);
 
         return true;
     }

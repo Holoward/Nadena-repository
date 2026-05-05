@@ -7,8 +7,12 @@ namespace Persistence.Repository;
 
 public class NetflixRecordRepository : MyRepositoryAsync<NetflixViewingRecord>, INetflixRecordRepository
 {
-    public NetflixRecordRepository(ApplicationDbContext dbContext) : base(dbContext)
+    private readonly IVolunteerRepository _volunteerRepository;
+    private new ApplicationDbContext DbContext => (ApplicationDbContext)base.DbContext;
+
+    public NetflixRecordRepository(ApplicationDbContext dbContext, IVolunteerRepository volunteerRepository) : base(dbContext)
     {
+        _volunteerRepository = volunteerRepository;
     }
 
     public async Task<List<NetflixViewingRecord>> GetByVolunteerIdAsync(int volunteerId)
@@ -20,17 +24,14 @@ public class NetflixRecordRepository : MyRepositoryAsync<NetflixViewingRecord>, 
 
     public async Task<List<NetflixViewingRecord>> GetAnonymizedByUserIdsAsync(List<Guid> userIds)
     {
-        var userIdStrings = userIds.Select(g => g.ToString()).ToList();
-        
-        var volunteerIds = await DbContext.Volunteers
-            .Where(v => userIdStrings.Contains(v.UserId))
-            .Select(v => v.Id)
-            .ToListAsync();
+        var volunteers = await _volunteerRepository.GetByIdsAsync(userIds);
+        var volunteerIds = volunteers.Select(v => v.Id).ToList();
 
         return await DbContext.NetflixViewingRecords
             .Where(r => volunteerIds.Contains(r.VolunteerId) && r.IsAnonymized)
             .ToListAsync();
     }
+
 
     public async Task AddRangeAsync(List<NetflixViewingRecord> records)
     {

@@ -11,13 +11,13 @@ namespace Persistence.Services;
 /// </summary>
 public class AuditLogService : IAuditLogService
 {
-    private readonly ApplicationDbContext _context;
+    private readonly NadenaIdentityDbContext _context;
     private readonly IHttpContextAccessor _httpContextAccessor;
     private readonly ILogger<AuditLogService> _logger;
     private readonly IDateTimeService _dateTimeService;
 
     public AuditLogService(
-        ApplicationDbContext context,
+        NadenaIdentityDbContext context,
         IHttpContextAccessor httpContextAccessor,
         ILogger<AuditLogService> logger,
         IDateTimeService dateTimeService)

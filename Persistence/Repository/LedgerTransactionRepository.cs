@@ -7,9 +7,9 @@ namespace Persistence.Repository;
 
 public class LedgerTransactionRepository : ITransactionRepository
 {
-    private readonly ApplicationDbContext _dbContext;
+    private readonly NadenaIdentityDbContext _dbContext;
 
-    public LedgerTransactionRepository(ApplicationDbContext dbContext)
+    public LedgerTransactionRepository(NadenaIdentityDbContext dbContext)
     {
         _dbContext = dbContext;
     }

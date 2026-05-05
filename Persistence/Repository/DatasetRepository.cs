@@ -8,6 +8,7 @@ namespace Persistence.Repository;
 public class DatasetRepository : MyRepositoryAsync<Dataset>, IDatasetRepository
 {
     private readonly IVolunteerRepository _volunteerRepository;
+    private new ApplicationDbContext DbContext => (ApplicationDbContext)base.DbContext;
 
     public DatasetRepository(ApplicationDbContext dbContext, IVolunteerRepository volunteerRepository) : base(dbContext)
     {

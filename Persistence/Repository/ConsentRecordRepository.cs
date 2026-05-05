@@ -5,9 +5,11 @@ using Persistence.Context;
 
 namespace Persistence.Repository;
 
-public class ConsentRecordRepository : MyRepositoryAsync<ConsentRecord>, IConsentRecordRepository
+public class ConsentRecordRepository : NadenaRepositoryBase<ConsentRecord>, IConsentRecordRepository
 {
-    public ConsentRecordRepository(ApplicationDbContext dbContext) : base(dbContext)
+    private new NadenaIdentityDbContext DbContext => (NadenaIdentityDbContext)base.DbContext;
+
+    public ConsentRecordRepository(NadenaIdentityDbContext dbContext) : base(dbContext)
     {
     }
 

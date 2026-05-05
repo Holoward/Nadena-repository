@@ -1,14 +1,20 @@
 using Application.Interfaces;
 using Domain.Entities;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Persistence.Context;
+using Persistence.Models;
 
 namespace Persistence.Repository;
 
-public class VolunteerRepository : MyRepositoryAsync<Volunteer>, IVolunteerRepository
+public class VolunteerRepository : NadenaRepositoryBase<Volunteer>, IVolunteerRepository
 {
-    public VolunteerRepository(ApplicationDbContext dbContext) : base(dbContext)
+    private readonly UserManager<ApplicationUser> _userManager;
+    private new NadenaIdentityDbContext DbContext => (NadenaIdentityDbContext)base.DbContext;
+
+    public VolunteerRepository(NadenaIdentityDbContext dbContext, UserManager<ApplicationUser> userManager) : base(dbContext)
     {
+        _userManager = userManager;
     }
 
     public async Task<Volunteer> GetByIdAsync(int id)
@@ -50,7 +56,7 @@ public class VolunteerRepository : MyRepositoryAsync<Volunteer>, IVolunteerRepos
         var volunteer = await DbContext.Volunteers.FindAsync(volunteerId);
         if (volunteer == null) return null;
 
-        var user = await DbContext.Users.FindAsync(volunteer.UserId);
+        var user = await _userManager.FindByIdAsync(volunteer.UserId);
         if (user == null) return null;
 
         return (user.Email ?? string.Empty, user.FullName);

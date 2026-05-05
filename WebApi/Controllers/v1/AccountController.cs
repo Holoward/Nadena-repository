@@ -15,17 +15,20 @@ namespace WebApi.Controllers.v1;
 public class AccountController : ControllerBase
 {
     private readonly ApplicationDbContext _dbContext;
+    private readonly NadenaIdentityDbContext _identityContext;
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly IEmailService _emailService;
     private readonly IAuditLogService _auditLogService;
 
     public AccountController(
         ApplicationDbContext dbContext,
+        NadenaIdentityDbContext identityContext,
         UserManager<ApplicationUser> userManager,
         IEmailService emailService,
         IAuditLogService auditLogService)
     {
         _dbContext = dbContext;
+        _identityContext = identityContext;
         _userManager = userManager;
         _emailService = emailService;
         _auditLogService = auditLogService;
@@ -46,7 +49,7 @@ public class AccountController : ControllerBase
             return NotFound();
         }
 
-        var preferences = await _dbContext.NotificationPreferences.AsNoTracking()
+        var preferences = await _identityContext.NotificationPreferences.AsNoTracking()
             .Where(preference => preference.UserId == userId)
             .ToListAsync();
 
@@ -165,7 +168,7 @@ public class AccountController : ControllerBase
             return Unauthorized();
         }
 
-        var sessions = await _dbContext.UserSessions.AsNoTracking()
+        var sessions = await _identityContext.UserSessions.AsNoTracking()
             .Where(session => session.UserId == userId)
             .OrderByDescending(session => session.Created)
             .ToListAsync();
@@ -182,7 +185,7 @@ public class AccountController : ControllerBase
             return Unauthorized();
         }
 
-        var sessions = await _dbContext.UserSessions.Where(session => session.UserId == userId && session.IsActive).ToListAsync();
+        var sessions = await _identityContext.UserSessions.Where(session => session.UserId == userId && session.IsActive).ToListAsync();
         foreach (var session in sessions)
         {
             session.IsActive = false;
@@ -196,7 +199,7 @@ public class AccountController : ControllerBase
             await _userManager.UpdateAsync(user);
         }
 
-        await _dbContext.SaveChangesAsync();
+        await _identityContext.SaveChangesAsync();
         await _auditLogService.LogAsync("AllSessionsRevoked", "UserSession", userId, true, userId);
         return Ok(new { message = "All sessions have been revoked." });
     }
@@ -211,7 +214,7 @@ public class AccountController : ControllerBase
         }
 
         var defaults = NotificationDefaults();
-        var stored = await _dbContext.NotificationPreferences
+        var stored = await _identityContext.NotificationPreferences
             .Where(preference => preference.UserId == userId)
             .ToListAsync();
 
@@ -237,13 +240,13 @@ public class AccountController : ControllerBase
             return Unauthorized();
         }
 
-        var existing = await _dbContext.NotificationPreferences.Where(preference => preference.UserId == userId).ToListAsync();
+        var existing = await _identityContext.NotificationPreferences.Where(preference => preference.UserId == userId).ToListAsync();
         foreach (var item in request)
         {
             var preference = existing.FirstOrDefault(entry => entry.EventType == item.EventType);
             if (preference == null)
             {
-                _dbContext.NotificationPreferences.Add(new Domain.Entities.NotificationPreference
+                _identityContext.NotificationPreferences.Add(new Domain.Entities.NotificationPreference
                 {
                     Id = Guid.NewGuid(),
                     UserId = userId,
@@ -257,7 +260,7 @@ public class AccountController : ControllerBase
             }
         }
 
-        await _dbContext.SaveChangesAsync();
+        await _identityContext.SaveChangesAsync();
         await _auditLogService.LogAsync("NotificationPreferencesUpdated", "NotificationPreference", userId, true, userId);
         return Ok(new { message = "Notification preferences updated." });
     }

@@ -17,18 +17,21 @@ public class DataPoolController : ControllerBase
     private readonly IApiKeyService _apiKeyService;
     private readonly IDataLicenseRepository _licenseRepository;
     private readonly IDataPoolRepository _poolRepository;
+    private readonly IWatchEventRepository _watchEventRepository;
 
     public DataPoolController(
         ISender mediator,
         IApiKeyService apiKeyService,
         IDataLicenseRepository licenseRepository,
         IDataPoolRepository poolRepository,
+        IWatchEventRepository watchEventRepository,
         DataPoolService dataPoolService)
     {
         _mediator = mediator;
         _apiKeyService = apiKeyService;
         _licenseRepository = licenseRepository;
         _poolRepository = poolRepository;
+        _watchEventRepository = watchEventRepository;
         _dataPoolService = dataPoolService;
     }
 
@@ -78,7 +81,8 @@ public class DataPoolController : ControllerBase
     /// <summary>
     /// B2B licensed data access endpoint.
     /// Pass the raw API key in the X-Api-Key header.
-    /// Returns paginated anonymized records from the pool.
+    /// Returns paginated anonymized records filtered to the pool's source table.
+    /// All pagination is done in the database — no in-memory buffering.
     /// </summary>
     // GET: api/v1/DataPool/{id}/data
     [HttpGet("{id}/data")]
@@ -105,17 +109,21 @@ public class DataPoolController : ControllerBase
         if (pool == null)
             return NotFound(new { message = "Pool not found." });
 
+        // DB-side paginated query scoped to the pool's source table
+        var (items, totalCount) = await _watchEventRepository.GetPagedAsync(
+            page, pageSize, pool.SourceTable, pool.Category);
+
         return Ok(new
         {
-            pool = new { pool.Id, pool.Name, pool.Category },
+            pool = new { pool.Id, pool.Name, pool.Category, pool.SourceTable },
             license = new
             {
                 license.LicensedFrom,
                 license.LicensedUntil,
                 daysRemaining = (int)(license.LicensedUntil - DateTime.UtcNow).TotalDays
             },
-            pagination = new { page, pageSize },
-            message = "Dataset delivery is handled via configured DeliveryEndpoint. Contact support for direct API access."
+            pagination = new { page, pageSize, total = totalCount },
+            data = items
         });
     }
 
@@ -125,10 +133,16 @@ public class DataPoolController : ControllerBase
         var pool = await _poolRepository.GetByIdAsync(id);
         if (pool == null || !pool.IsActive)
             return NotFound(new { message = "Pool not found." });
+
+        // DB-side: fetch only 10 records for preview — no full table load
+        var (previewItems, _) = await _watchEventRepository.GetPagedAsync(
+            page: 1, pageSize: 10, sourceTable: pool.SourceTable, category: pool.Category);
+
         return Ok(new
         {
-            pool = new { pool.Id, pool.Name, pool.Category, pool.ApproximateRecordCount },
-            message = "Preview available on request. Contact david@nadena.tech for a sample dataset."
+            pool = new { pool.Id, pool.Name, pool.Category, pool.ApproximateRecordCount, pool.SourceTable },
+            previewCount = previewItems.Count,
+            data = previewItems
         });
     }
 }

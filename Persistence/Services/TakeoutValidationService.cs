@@ -114,6 +114,59 @@ public class TakeoutValidationService : ITakeoutValidationService
                 catch { /* non-fatal */ }
             }
 
+            var netflixEntry = archive.Entries.FirstOrDefault(e =>
+                e.FullName.Contains("ViewingActivity", StringComparison.OrdinalIgnoreCase) &&
+                e.FullName.EndsWith(".csv", StringComparison.OrdinalIgnoreCase));
+
+            var totalNetflixSessions = 0;
+            var netflixDeviceTypes = new Dictionary<string, int>();
+            var netflixSessionMinutes = new List<double>();
+
+            if (netflixEntry != null)
+            {
+                try
+                {
+                    using var netflixStream = netflixEntry.Open();
+                    using var netflixReader = new StreamReader(netflixStream);
+                    var header = await netflixReader.ReadLineAsync();
+                    if (header != null)
+                    {
+                        var headerCols = header.Split(',');
+                        var durationIdx = Array.FindIndex(headerCols, h => h.Trim('"').Equals("Duration", StringComparison.OrdinalIgnoreCase));
+                        var deviceIdx = Array.FindIndex(headerCols, h => h.Trim('"').Equals("Device Type", StringComparison.OrdinalIgnoreCase));
+
+                        string? line;
+                        while ((line = await netflixReader.ReadLineAsync()) != null)
+                        {
+                            if (string.IsNullOrWhiteSpace(line)) continue;
+                            var cols = line.Split(',');
+                            totalNetflixSessions++;
+
+                            if (deviceIdx >= 0 && deviceIdx < cols.Length)
+                            {
+                                var device = cols[deviceIdx].Trim('"').Trim();
+                                if (!string.IsNullOrEmpty(device))
+                                {
+                                    var deviceKey = device.Length > 30 ? device[..30] : device;
+                                    netflixDeviceTypes[deviceKey] = netflixDeviceTypes.GetValueOrDefault(deviceKey) + 1;
+                                }
+                            }
+
+                            if (durationIdx >= 0 && durationIdx < cols.Length)
+                            {
+                                var durStr = cols[durationIdx].Trim('"').Trim();
+                                if (TimeSpan.TryParse(durStr, out var dur))
+                                    netflixSessionMinutes.Add(dur.TotalMinutes);
+                            }
+                        }
+
+                        if (totalNetflixSessions > 0)
+                            dataSources.Add("Netflix");
+                    }
+                }
+                catch { /* non-fatal — Netflix export is optional */ }
+            }
+
             return new TakeoutValidationResult
             {
                 IsValid = true,
@@ -125,6 +178,11 @@ public class TakeoutValidationService : ITakeoutValidationService
                     HourOfDayDistribution = hourDist,
                     DayOfWeekDistribution = dayDist,
                     TotalSpotifyTracks = totalSpotifyTracks,
+                    TotalNetflixSessions = totalNetflixSessions,
+                    NetflixDeviceTypeDistribution = netflixDeviceTypes,
+                    AverageNetflixSessionMinutes = netflixSessionMinutes.Count > 0
+                        ? Math.Round(netflixSessionMinutes.Average(), 2)
+                        : 0,
                     EarliestRecord = earliest,
                     LatestRecord = latest,
                     DataSourceTypes = string.Join(",", dataSources)

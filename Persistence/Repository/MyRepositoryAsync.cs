@@ -1,4 +1,4 @@
-﻿using Application.Interfaces;
+using Application.Interfaces;
 using Ardalis.Specification;
 using Ardalis.Specification.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -6,11 +6,18 @@ using Persistence.Context;
 
 namespace Persistence.Repository;
 
-public class MyRepositoryAsync<T> : RepositoryBase<T>, IRepositoryAsync<T> where T : class
+public abstract class NadenaRepositoryBase<T> : RepositoryBase<T>, IRepositoryAsync<T> where T : class
 {
-    public readonly ApplicationDbContext DbContext;
-    public MyRepositoryAsync(ApplicationDbContext dbContext) : base(dbContext)
+    public readonly DbContext DbContext;
+    public NadenaRepositoryBase(DbContext dbContext) : base(dbContext)
     {
         DbContext = dbContext;
+    }
+}
+
+public class MyRepositoryAsync<T> : NadenaRepositoryBase<T> where T : class
+{
+    public MyRepositoryAsync(ApplicationDbContext dbContext) : base(dbContext)
+    {
     }
 }

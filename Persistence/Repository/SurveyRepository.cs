@@ -7,9 +7,9 @@ namespace Persistence.Repository;
 
 public class SurveyRepository : ISurveyRepository
 {
-    private readonly ApplicationDbContext _dbContext;
+    private readonly NadenaIdentityDbContext _dbContext;
 
-    public SurveyRepository(ApplicationDbContext dbContext)
+    public SurveyRepository(NadenaIdentityDbContext dbContext)
     {
         _dbContext = dbContext;
     }

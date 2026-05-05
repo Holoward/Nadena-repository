@@ -21,6 +21,9 @@ public class AnonymizedTakeoutPayload
     public Dictionary<int, int> HourOfDayDistribution { get; set; } = new();
     public Dictionary<string, int> DayOfWeekDistribution { get; set; } = new();
     public int TotalSpotifyTracks { get; set; }
+    public int TotalNetflixSessions { get; set; }
+    public Dictionary<string, int> NetflixDeviceTypeDistribution { get; set; } = new();
+    public double AverageNetflixSessionMinutes { get; set; }
     public DateTime EarliestRecord { get; set; }
     public DateTime LatestRecord { get; set; }
     public string DataSourceTypes { get; set; } = string.Empty;

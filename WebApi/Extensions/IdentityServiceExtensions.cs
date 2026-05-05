@@ -34,7 +34,7 @@ public static class IdentityServiceExtensions
             options.Password.RequiredLength = 8;
             options.Password.RequiredUniqueChars = 1;
         })
-        .AddEntityFrameworkStores<ApplicationDbContext>()
+        .AddEntityFrameworkStores<NadenaIdentityDbContext>()
         .AddDefaultTokenProviders();
 
         services.AddAuthentication(options =>
@@ -71,8 +71,8 @@ public static class IdentityServiceExtensions
                         return;
                     }
 
-                    var dbContext = context.HttpContext.RequestServices.GetRequiredService<ApplicationDbContext>();
-                    var user = await dbContext.Users.AsNoTracking().FirstOrDefaultAsync(item => item.Id == userId);
+                    var identityContext = context.HttpContext.RequestServices.GetRequiredService<NadenaIdentityDbContext>();
+                    var user = await identityContext.Users.AsNoTracking().FirstOrDefaultAsync(item => item.Id == userId);
                     if (user == null || user.IsSuspended || user.DeletedAt.HasValue)
                     {
                         context.Fail("User is inactive.");
@@ -91,7 +91,7 @@ public static class IdentityServiceExtensions
                         return;
                     }
 
-                    var session = await dbContext.UserSessions.AsNoTracking()
+                    var session = await identityContext.UserSessions.AsNoTracking()
                         .FirstOrDefaultAsync(item => item.Id == parsedSessionId && item.UserId == userId);
 
                     if (session == null || !session.IsActive || session.RevokedAt.HasValue || session.ExpiresAt <= DateTime.UtcNow)

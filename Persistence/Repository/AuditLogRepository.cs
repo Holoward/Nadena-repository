@@ -6,9 +6,9 @@ namespace Persistence.Repository;
 
 public class AuditLogRepository : IAuditLogRepository
 {
-    private readonly ApplicationDbContext _context;
+    private readonly NadenaIdentityDbContext _context;
 
-    public AuditLogRepository(ApplicationDbContext context)
+    public AuditLogRepository(NadenaIdentityDbContext context)
     {
         _context = context;
     }

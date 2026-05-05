@@ -20,7 +20,7 @@ public class DataPoolService
 
         return dataPool.SourceTable switch
         {
-            "YoutubeComments" => await _context.YoutubeComments.LongCountAsync(),
+            "WatchEvents" => await _context.WatchEvents.LongCountAsync(),
             "SpotifyListeningRecords" => await _context.SpotifyListeningRecords.LongCountAsync(),
             "NetflixViewingRecords" => await _context.NetflixViewingRecords.LongCountAsync(),
             _ => 0

@@ -8,9 +8,23 @@ public class VolunteerDataExportDto
     public string? PayPalEmail { get; set; }
     public string Status { get; set; } = string.Empty;
     public DateTime CreatedAt { get; set; }
+    public List<WatchEventExportDto> WatchEvents { get; set; } = new();
     public List<ConsentRecordExportDto> ConsentRecords { get; set; } = new();
     public List<PaymentExportDto> PaymentHistory { get; set; } = new();
     public List<UploadHistoryExportDto> UploadHistory { get; set; } = new();
+}
+
+public class WatchEventExportDto
+{
+    public string Category { get; set; } = string.Empty;
+    public DateTime WatchedAt { get; set; }
+    public int HourOfDay { get; set; }
+    public int DayOfWeek { get; set; }
+    public int Month { get; set; }
+    public int Year { get; set; }
+    public int SessionId { get; set; }
+    public int PositionInSession { get; set; }
+    public bool IsRepeat { get; set; }
 }
 
 public class ConsentRecordExportDto

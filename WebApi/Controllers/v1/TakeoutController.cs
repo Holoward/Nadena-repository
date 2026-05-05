@@ -19,6 +19,7 @@ public class TakeoutController : ControllerBase
     private readonly ITakeoutValidationService _validationService;
     private readonly IDataDeliveryService _deliveryService;
     private readonly IVolunteerRepository _volunteerRepository;
+    private readonly IWatchEventRepository _watchEventRepository;
     private readonly IRepositoryAsync<DatasetPurchase> _purchaseRepository;
     private readonly IWalletRepository _walletRepository;
     private readonly ICurrentUserService _currentUserService;
@@ -31,6 +32,7 @@ public class TakeoutController : ControllerBase
         ITakeoutValidationService validationService,
         IDataDeliveryService deliveryService,
         IVolunteerRepository volunteerRepository,
+        IWatchEventRepository watchEventRepository,
         IRepositoryAsync<DatasetPurchase> purchaseRepository,
         IWalletRepository walletRepository,
         ICurrentUserService currentUserService,
@@ -39,6 +41,7 @@ public class TakeoutController : ControllerBase
         _validationService = validationService;
         _deliveryService = deliveryService;
         _volunteerRepository = volunteerRepository;
+        _watchEventRepository = watchEventRepository;
         _purchaseRepository = purchaseRepository;
         _walletRepository = walletRepository;
         _currentUserService = currentUserService;
@@ -98,6 +101,52 @@ public class TakeoutController : ControllerBase
         volunteer.HasDonated = true;
         volunteer.ActivatedDate = DateTime.UtcNow;
         await _volunteerRepository.UpdateAsync(volunteer);
+
+        var watchEvents = new List<Domain.Entities.WatchEvent>();
+        var sessionId = 1;
+        var positionInSession = 1;
+        DateTime? lastEventTime = null;
+
+        foreach (var kvp in result.Payload!.HourOfDayDistribution.OrderBy(k => k.Key))
+        {
+            for (int i = 0; i < kvp.Value; i++)
+            {
+                var approxTime = result.Payload.EarliestRecord.AddHours(kvp.Key);
+
+                if (lastEventTime.HasValue && (approxTime - lastEventTime.Value).TotalMinutes > 30)
+                {
+                    sessionId++;
+                    positionInSession = 1;
+                }
+
+                watchEvents.Add(new Domain.Entities.WatchEvent
+                {
+                    ContributorId = Guid.Parse(userId),
+                    VideoIdHash = string.Empty,
+                    ChannelIdHash = string.Empty,
+                    Category = result.Payload.CategoryDistribution.OrderByDescending(c => c.Value).FirstOrDefault().Key ?? "Other",
+                    WatchedAt = approxTime,
+                    HourOfDay = kvp.Key,
+                    DayOfWeek = (int)approxTime.DayOfWeek,
+                    Month = approxTime.Month,
+                    Year = approxTime.Year,
+                    IsRepeat = false,
+                    SessionId = sessionId,
+                    PositionInSession = positionInSession++,
+                    Created = DateTime.UtcNow,
+                    CreatedBy = userId
+                });
+
+                lastEventTime = approxTime;
+            }
+        }
+
+        if (watchEvents.Count > 0)
+        {
+            await _watchEventRepository.ReplaceForContributorAsync(
+                Guid.Parse(userId), watchEvents);
+            _logger.LogInformation("Wrote {Count} WatchEvents for contributor {UserId}", watchEvents.Count, userId);
+        }
 
         var allPurchases = await _purchaseRepository.ListAsync();
         var activePurchases = allPurchases

@@ -21,14 +21,16 @@ Consent-based behavioral data marketplace. Contributors export their YouTube, Sp
 | Layer | Technology |
 |---|---|
 | Backend | .NET 10, onion architecture, MediatR CQRS, FluentValidation, Serilog |
-| Database | SQLite (pilot) -- EF Core migrations -- ready to swap to PostgreSQL |
-| Auth | ASP.NET Core Identity + JWT |
+| Database | PostgreSQL -- Dual-Context (Application & Identity) -- EF Core migrations |
+| Auth | ASP.NET Core Identity + JWT + Contributor OAuth Tokens |
 | Buyer payments | Stripe Checkout + Webhook |
 | Contributor payouts | PayPal Payouts API |
-| Storage | Cloudflare R2 -- process-and-delete model |
+| Delivery | Real-time webhook delivery to Buyer's DeliveryEndpoint |
+| Storage | Cloudflare R2 -- Zero-Persistence process-and-delete model |
 | Google OAuth | drive.readonly scope -- AES-256 encrypted refresh tokens |
 | Background service | DrivePollingService (IHostedService) -- 30-minute interval |
-| Frontend | React served by .NET in production |
+| Frontend | React + React Native apps |
+| Testing | WebApplicationFactory + xUnit (InMemory integration tests) |
 
 ---
 
@@ -48,14 +50,23 @@ WebApi/          -- controllers + React frontend (TakeoutController, OAuthContro
 ### Prerequisites
 - .NET 10 SDK
 - Node.js v18+
+- PostgreSQL server running locally (default: localhost:5432)
 
 ### Backend
 ```bash
 cd WebApi
-dotnet ef database update --project ../Persistence --startup-project .
+# Apply PostgreSQL migrations to both DbContexts
+dotnet ef database update -c ApplicationDbContext -p ../Persistence -s .
+dotnet ef database update -c NadenaIdentityDbContext -p ../Persistence -s .
 dotnet run
 ```
 API runs at http://localhost:5000. Swagger at http://localhost:5000/swagger.
+
+### E2E Integration Tests
+```bash
+dotnet test Tests/NadenaE2ETests/NadenaE2ETests.csproj
+```
+Tests automatically use an isolated `InMemory` database provider for safe execution.
 
 ### Frontend (development)
 ```bash
@@ -82,6 +93,11 @@ Copy appsettings.example.json to appsettings.Development.json and fill in:
 
 ```json
 {
+  "ConnectionStrings": {
+    "DefaultConnection": "Host=localhost;Database=NadenaAppDb;Username=postgres;Password=postgres",
+    "IdentityConnection": "Host=localhost;Database=NadenaIdentityDb;Username=postgres;Password=postgres"
+  },
+  "UseInMemoryDatabase": false,
   "NadenaSettings": {
     "GoogleClientId": "",
     "GoogleClientSecret": "",
@@ -93,9 +109,9 @@ Copy appsettings.example.json to appsettings.Development.json and fill in:
     "PayPalClientSecret": "",
     "PayPalMode": "sandbox",
     "FrontendUrl": "http://localhost:3000",
-    "ContributorSharePercent": 0,
-    "ModeSharePercent": 0,
-    "NadenaSharePercent": 0
+    "ContributorSharePercent": 60,
+    "ModeSharePercent": 10,
+    "NadenaSharePercent": 30
   }
 }
 ```

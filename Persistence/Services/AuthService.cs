@@ -25,6 +25,7 @@ public class AuthService : IAuthService
     private readonly IVolunteerRepository _volunteerRepository;
     private readonly IBuyerRepository _buyerRepository;
     private readonly ApplicationDbContext _context;
+    private readonly NadenaIdentityDbContext _identityContext;
     private readonly IAuditLogService _auditLogService;
     private readonly IEmailService _emailService;
 
@@ -34,6 +35,7 @@ public class AuthService : IAuthService
         IVolunteerRepository volunteerRepository,
         IBuyerRepository buyerRepository,
         ApplicationDbContext context,
+        NadenaIdentityDbContext identityContext,
         IAuditLogService auditLogService,
         IEmailService emailService)
     {
@@ -42,6 +44,7 @@ public class AuthService : IAuthService
         _volunteerRepository = volunteerRepository;
         _buyerRepository = buyerRepository;
         _context = context;
+        _identityContext = identityContext;
         _auditLogService = auditLogService;
         _emailService = emailService;
     }
@@ -88,8 +91,8 @@ public class AuthService : IAuthService
             UserAgent = null,
             ExpiresAt = DateTime.UtcNow.AddMinutes(GetExpiryMinutes())
         };
-        _context.UserSessions.Add(session);
-        await _context.SaveChangesAsync();
+        _identityContext.UserSessions.Add(session);
+        await _identityContext.SaveChangesAsync();
 
         var token = GenerateJwtToken(user, session);
         await _auditLogService.LogAsync(
@@ -161,13 +164,12 @@ public class AuthService : IAuthService
             SecurityStamp = Guid.NewGuid().ToString()
         };
 
-        using var transaction = await _context.Database.BeginTransactionAsync();
+        var userCreated = false;
         try
         {
             var result = await _userManager.CreateAsync(user, password);
             if (!result.Succeeded)
             {
-                await transaction.RollbackAsync();
                 var errorMessage = string.Join(", ", result.Errors.Select(e => e.Description));
                 await _auditLogService.LogAsync(
                     action: "RegistrationFailed",
@@ -177,6 +179,8 @@ public class AuthService : IAuthService
                     errorMessage: errorMessage);
                 return new ServiceResponse<string>(errorMessage);
             }
+
+            userCreated = true;
 
             // Automatically create linked record based on role
             if (string.Equals(normalizedRole, UserRoles.DataContributor, StringComparison.Ordinal))
@@ -206,8 +210,6 @@ public class AuthService : IAuthService
                 await _buyerRepository.AddAsync(buyer);
             }
 
-            await transaction.CommitAsync();
-            
             // Log successful registration
             await _auditLogService.LogAsync(
                 action: "UserRegistered",
@@ -230,7 +232,11 @@ public class AuthService : IAuthService
         }
         catch (Exception)
         {
-            await transaction.RollbackAsync();
+            if (userCreated)
+            {
+                await _userManager.DeleteAsync(user);
+            }
+
             throw;
         }
 
@@ -244,8 +250,8 @@ public class AuthService : IAuthService
             DeviceName = "Web",
             ExpiresAt = DateTime.UtcNow.AddMinutes(GetExpiryMinutes())
         };
-        _context.UserSessions.Add(session);
-        await _context.SaveChangesAsync();
+        _identityContext.UserSessions.Add(session);
+        await _identityContext.SaveChangesAsync();
 
         var token = GenerateJwtToken(user, session);
         return new ServiceResponse<string>(token, "Registration successful.");
@@ -255,7 +261,7 @@ public class AuthService : IAuthService
     {
         var sanitizedEmail = InputSanitizer.SanitizeEmail(email);
         var oneHourAgo = DateTime.UtcNow.AddHours(-1);
-        var recentRequests = await _context.PasswordResetRequests.CountAsync(request =>
+        var recentRequests = await _identityContext.PasswordResetRequests.CountAsync(request =>
             request.Email == sanitizedEmail &&
             request.RequestedAt >= oneHourAgo);
 
@@ -281,8 +287,8 @@ public class AuthService : IAuthService
             ExpiresAt = DateTime.UtcNow.AddHours(1)
         };
 
-        _context.PasswordResetRequests.Add(resetRequest);
-        await _context.SaveChangesAsync();
+        _identityContext.PasswordResetRequests.Add(resetRequest);
+        await _identityContext.SaveChangesAsync();
 
         var resetLink = BuildFrontendLink($"/reset-password?email={Uri.EscapeDataString(sanitizedEmail)}&token={Uri.EscapeDataString(encodedToken)}");
         await _emailService.SendPasswordResetAsync(sanitizedEmail, resetLink);
@@ -299,7 +305,7 @@ public class AuthService : IAuthService
             return new ServiceResponse<string>("Invalid password reset request.");
         }
 
-        var resetRequest = await _context.PasswordResetRequests
+        var resetRequest = await _identityContext.PasswordResetRequests
             .OrderByDescending(request => request.RequestedAt)
             .FirstOrDefaultAsync(request => request.Email == sanitizedEmail && request.Token == token && request.UsedAt == null && request.ExpiresAt > DateTime.UtcNow);
 
@@ -319,7 +325,7 @@ public class AuthService : IAuthService
         user.LastPasswordChangedAt = DateTime.UtcNow;
         user.SecurityStamp = Guid.NewGuid().ToString();
         await _userManager.UpdateAsync(user);
-        await _context.SaveChangesAsync();
+        await _identityContext.SaveChangesAsync();
         await _auditLogService.LogAsync("PasswordResetCompleted", "User", user.Id, true, user.Id);
         return new ServiceResponse<string>("Password updated successfully.", "Password reset complete.");
     }

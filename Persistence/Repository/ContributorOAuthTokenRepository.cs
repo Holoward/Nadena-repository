@@ -7,9 +7,9 @@ namespace Persistence.Repository;
 
 public class ContributorOAuthTokenRepository : IContributorOAuthTokenRepository
 {
-    private readonly ApplicationDbContext _context;
+    private readonly NadenaIdentityDbContext _context;
 
-    public ContributorOAuthTokenRepository(ApplicationDbContext context)
+    public ContributorOAuthTokenRepository(NadenaIdentityDbContext context)
     {
         _context = context;
     }

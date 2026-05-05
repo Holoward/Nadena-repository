@@ -1,52 +1,44 @@
 using Application.Interfaces;
 using Domain.Common;
 using Domain.Entities;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using Persistence.Models;
 
 namespace Persistence.Context;
 
-public sealed class ApplicationDbContext : DbContext
+public sealed class NadenaIdentityDbContext : IdentityDbContext<ApplicationUser>
 {
     private readonly IDateTimeService _dateTimeService;
     private readonly ICurrentUserService _currentUserService;
 
-    public ApplicationDbContext(
-        DbContextOptions<ApplicationDbContext> options,
+    public NadenaIdentityDbContext(
+        DbContextOptions<NadenaIdentityDbContext> options,
         IDateTimeService dateTimeService,
         ICurrentUserService currentUserService) : base(options)
     {
-        // Use default tracking behavior to allow SaveChanges for auditing
-        // QueryTrackingBehavior can be set at query level when needed
         _dateTimeService = dateTimeService;
         _currentUserService = currentUserService;
     }
 
-    protected override void OnModelCreating(ModelBuilder builder)
-    {
-        base.OnModelCreating(builder);
-    }
-
-    public DbSet<Dataset> Datasets { get; set; }
-    public DbSet<DatasetPurchase> DatasetPurchases { get; set; }
-    public DbSet<SpotifyListeningRecord> SpotifyListeningRecords { get; set; }
-    public DbSet<NetflixViewingRecord> NetflixViewingRecords { get; set; }
-
-    // B2B Licensing
-    public DbSet<DataPool> DataPools { get; set; }
-    public DbSet<DataLicense> DataLicenses { get; set; }
-    public DbSet<ApiKey> ApiKeys { get; set; }
-
-    public DbSet<DatasetAccessGrant> DatasetAccessGrants { get; set; }
-
-    // Subscriptions
-    public DbSet<DatasetSubscription> DatasetSubscriptions { get; set; }
-
-    // Google Takeout — YouTube Watch History
-    public DbSet<WatchEvent> WatchEvents { get; set; }
-
-    // Donations
-    public DbSet<Donation> Donations { get; set; }
-
+    public DbSet<Volunteer> Volunteers { get; set; }
+    public DbSet<Buyer> Buyers { get; set; }
+    public DbSet<ConsentRecord> ConsentRecords { get; set; }
+    public DbSet<VolunteerPayment> VolunteerPayments { get; set; }
+    public DbSet<AuditLog> AuditLogs { get; set; }
+    public DbSet<Wallet> Wallets { get; set; }
+    public DbSet<LedgerTransaction> Transactions { get; set; }
+    public DbSet<EmailLog> EmailLogs { get; set; }
+    public DbSet<DeletionRequest> DeletionRequests { get; set; }
+    public DbSet<ContributorDisbursement> ContributorDisbursements { get; set; }
+    public DbSet<UserSession> UserSessions { get; set; }
+    public DbSet<PasswordResetRequest> PasswordResetRequests { get; set; }
+    public DbSet<NotificationPreference> NotificationPreferences { get; set; }
+    public DbSet<ContributorEmail> ContributorEmails { get; set; }
+    public DbSet<ContributorOAuthToken> ContributorOAuthTokens { get; set; }
+    public DbSet<SurveyTemplate> SurveyTemplates { get; set; }
+    public DbSet<SurveyQuestion> SurveyQuestions { get; set; }
+    public DbSet<SurveyResponse> SurveyResponses { get; set; }
 
     private string GetCurrentUser()
     {
@@ -57,7 +49,7 @@ public sealed class ApplicationDbContext : DbContext
     {
         var currentUser = GetCurrentUser();
 
-        // this foreach is for update the Created and lastModified props in all the entities that inherit from AuditableBaseEntity when they save the changes
+        // Audit for int-based entities
         foreach (var entry in ChangeTracker.Entries<AuditableBaseEntity>())
         {
             switch (entry.State)
@@ -74,7 +66,7 @@ public sealed class ApplicationDbContext : DbContext
             }
         }
 
-        // Handle AuditableBaseEntityGuid entities
+        // Audit for Guid-based entities
         foreach (var entry in ChangeTracker.Entries<AuditableBaseEntityGuid>())
         {
             switch (entry.State)
@@ -91,6 +83,14 @@ public sealed class ApplicationDbContext : DbContext
             }
         }
 
+        // Append-only enforcement for transactions
+        var mutatedTransactions = ChangeTracker.Entries<LedgerTransaction>()
+            .Where(e => e.State == EntityState.Modified || e.State == EntityState.Deleted)
+            .ToList();
+        if (mutatedTransactions.Any())
+        {
+            throw new InvalidOperationException("Ledger transactions are append-only.");
+        }
 
         return base.SaveChangesAsync(cancellationToken);
     }

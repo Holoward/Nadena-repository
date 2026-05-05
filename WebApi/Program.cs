@@ -38,12 +38,6 @@ builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 builder.Services.AddScoped<RequireDataContributorOnboardingFilter>();
 builder.Services.AddHttpClient();
 
-// Named HttpClient for Groq API
-builder.Services.AddHttpClient("GroqClient", client => {
-    client.BaseAddress = new Uri("https://api.groq.com");
-    client.Timeout = TimeSpan.FromSeconds(30);
-});
-
 builder.Services.AddControllersWithViews();
 builder.Services.AddSwaggerGen();
 builder.Services.AddApplicationLayer();
@@ -62,7 +56,7 @@ builder.Services.AddApiVersioning(config =>
 // Health checks
 builder.Services.AddHealthChecks()
     .AddDbContextCheck<ApplicationDbContext>("database")
-    .AddUrlGroup(new Uri("https://api.groq.com"), "groq-api", tags: ["external"])
+    .AddDbContextCheck<NadenaIdentityDbContext>("identity-database")
     .AddUrlGroup(new Uri("https://api.stripe.com"), "stripe-api", tags: ["external"]);
 
 // Register StripeClient
@@ -138,9 +132,20 @@ using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
     var dbContext = services.GetRequiredService<ApplicationDbContext>();
-    await dbContext.Database.MigrateAsync();
-    await SeedIdentityDataAsync(services, builder.Configuration);
-    await SeedPlatformWalletAsync(dbContext);
+    var identityDbContext = services.GetRequiredService<NadenaIdentityDbContext>();
+
+    if (identityDbContext.Database.IsRelational())
+    {
+        await identityDbContext.Database.MigrateAsync();
+        await dbContext.Database.MigrateAsync();
+    }
+    else
+    {
+        await identityDbContext.Database.EnsureCreatedAsync();
+        await dbContext.Database.EnsureCreatedAsync();
+    }
+    await SeedIdentityDataAsync(services, builder.Configuration, identityDbContext);
+    await SeedPlatformWalletAsync(identityDbContext);
     await DataPoolSeeder.SeedDataPoolsAsync(dbContext);
     await SeedMarketplaceDataAsync(dbContext);
 }
@@ -205,11 +210,10 @@ app.MapFallbackToFile("index.html");
 
 app.Run();
 
-static async Task SeedIdentityDataAsync(IServiceProvider services, IConfiguration configuration)
+static async Task SeedIdentityDataAsync(IServiceProvider services, IConfiguration configuration, NadenaIdentityDbContext identityDbContext)
 {
     var userManager = services.GetRequiredService<UserManager<ApplicationUser>>();
     var roleManager = services.GetRequiredService<RoleManager<IdentityRole>>();
-    var dbContext = services.GetRequiredService<ApplicationDbContext>();
 
     foreach (var roleName in new[] { "Admin", "Data Client", "Data Contributor" })
     {
@@ -251,11 +255,11 @@ static async Task SeedIdentityDataAsync(IServiceProvider services, IConfiguratio
         await userManager.AddToRoleAsync(adminUser, "Admin");
     }
 
-    var staleBuyer = await dbContext.Buyers.FirstOrDefaultAsync(buyer => buyer.UserId == adminUser.Id);
+    var staleBuyer = await identityDbContext.Buyers.FirstOrDefaultAsync(buyer => buyer.UserId == adminUser.Id);
     if (staleBuyer != null)
     {
-        dbContext.Buyers.Remove(staleBuyer);
-        await dbContext.SaveChangesAsync();
+        identityDbContext.Buyers.Remove(staleBuyer);
+        await identityDbContext.SaveChangesAsync();
     }
 }
 
@@ -284,15 +288,15 @@ static async Task SeedMarketplaceDataAsync(ApplicationDbContext dbContext)
     await dbContext.SaveChangesAsync();
 }
 
-static async Task SeedPlatformWalletAsync(ApplicationDbContext dbContext)
+static async Task SeedPlatformWalletAsync(NadenaIdentityDbContext identityDbContext)
 {
-    var exists = await dbContext.Wallets.AnyAsync(wallet => wallet.OwnerId == "platform");
+    var exists = await identityDbContext.Wallets.AnyAsync(wallet => wallet.OwnerId == "platform");
     if (exists)
     {
         return;
     }
 
-    dbContext.Wallets.Add(new Wallet
+    identityDbContext.Wallets.Add(new Wallet
     {
         Id = Guid.NewGuid(),
         OwnerId = "platform",
@@ -305,5 +309,7 @@ static async Task SeedPlatformWalletAsync(ApplicationDbContext dbContext)
         CreatedBy = "System"
     });
 
-    await dbContext.SaveChangesAsync();
+    await identityDbContext.SaveChangesAsync();
 }
+
+public partial class Program { }

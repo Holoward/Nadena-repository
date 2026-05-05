@@ -7,9 +7,9 @@ namespace Persistence.Repository;
 
 public class VolunteerPaymentRepository : IVolunteerPaymentRepository
 {
-    private readonly ApplicationDbContext _dbContext;
+    private readonly NadenaIdentityDbContext _dbContext;
 
-    public VolunteerPaymentRepository(ApplicationDbContext dbContext)
+    public VolunteerPaymentRepository(NadenaIdentityDbContext dbContext)
     {
         _dbContext = dbContext;
     }

@@ -7,9 +7,9 @@ namespace Persistence.Repository;
 
 public class WalletRepository : IWalletRepository
 {
-    private readonly ApplicationDbContext _dbContext;
+    private readonly NadenaIdentityDbContext _dbContext;
 
-    public WalletRepository(ApplicationDbContext dbContext)
+    public WalletRepository(NadenaIdentityDbContext dbContext)
     {
         _dbContext = dbContext;
     }

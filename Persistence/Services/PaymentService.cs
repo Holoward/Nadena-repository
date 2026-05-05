@@ -2,23 +2,28 @@ using Application.Interfaces;
 using Application.Wrappers;
 using Domain.Entities;
 using Domain.Enums;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Persistence.Context;
+using Persistence.Models;
 
 namespace Persistence.Services;
 
 public class PaymentService : IPaymentService
 {
-    private readonly ApplicationDbContext _dbContext;
+    private readonly NadenaIdentityDbContext _dbContext;
+    private readonly UserManager<ApplicationUser> _userManager;
     private readonly IEmailService _emailService;
     private readonly IAuditLogService _auditLogService;
 
     public PaymentService(
-        ApplicationDbContext dbContext,
+        NadenaIdentityDbContext dbContext,
+        UserManager<ApplicationUser> userManager,
         IEmailService emailService,
         IAuditLogService auditLogService)
     {
         _dbContext = dbContext;
+        _userManager = userManager;
         _emailService = emailService;
         _auditLogService = auditLogService;
     }
@@ -39,7 +44,7 @@ public class PaymentService : IPaymentService
             return new ServiceResponse<string>(existing.Id.ToString(), "Idempotent replay");
         }
 
-        var buyerUser = await _dbContext.Users.FirstOrDefaultAsync(user => user.Id == dataClientUserId.ToString());
+        var buyerUser = await _userManager.FindByIdAsync(dataClientUserId.ToString());
         if (buyerUser == null)
         {
             return new ServiceResponse<string>("Data client not found.");
@@ -143,7 +148,7 @@ public class PaymentService : IPaymentService
 
                 contributorWallet.LastUpdated = DateTime.UtcNow;
 
-                var contributorUser = await _dbContext.Users.FirstOrDefaultAsync(user => user.Id == contributor.value.UserId);
+                var contributorUser = await _userManager.FindByIdAsync(contributor.value.UserId);
                 if (contributorUser?.Email is { Length: > 0 } contributorEmail)
                 {
                     await _emailService.SendDataPurchasedAsync(contributorEmail, contributorUser.FullName, amount);
@@ -209,7 +214,7 @@ public class PaymentService : IPaymentService
         _dbContext.Transactions.Add(completionTransaction);
         await _dbContext.SaveChangesAsync();
 
-        var contributorUser = await _dbContext.Users.FirstOrDefaultAsync(user => user.Id == contributorWallet.OwnerId);
+        var contributorUser = await _userManager.FindByIdAsync(contributorWallet.OwnerId);
         if (contributorUser?.Email is { Length: > 0 } contributorEmail)
         {
             await _emailService.SendPayoutProcessedAsync(contributorEmail, contributorUser.FullName, heldTransaction.Amount);
@@ -255,7 +260,7 @@ public class PaymentService : IPaymentService
         _dbContext.ContributorDisbursements.Add(disbursement);
         await _dbContext.SaveChangesAsync();
 
-        var contributorUser = await _dbContext.Users.FirstOrDefaultAsync(user => user.Id == payoutWallet.OwnerId);
+        var contributorUser = await _userManager.FindByIdAsync(payoutWallet.OwnerId);
         if (contributorUser?.Email is { Length: > 0 } contributorEmail)
         {
             await _emailService.SendPayoutProcessedAsync(contributorEmail, contributorUser.FullName, payoutTransaction.Amount);

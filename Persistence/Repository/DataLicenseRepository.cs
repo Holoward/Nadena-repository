@@ -8,6 +8,8 @@ namespace Persistence.Repository;
 
 public class DataLicenseRepository : MyRepositoryAsync<DataLicense>, IDataLicenseRepository
 {
+    private new ApplicationDbContext DbContext => (ApplicationDbContext)base.DbContext;
+
     public DataLicenseRepository(ApplicationDbContext dbContext) : base(dbContext) { }
 
     public async Task<DataLicense?> GetByIdAsync(Guid id)

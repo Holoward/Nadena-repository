@@ -7,6 +7,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Persistence.Context;
+using Persistence.Models;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Domain.Enums;
 using Application.Interfaces;
@@ -21,14 +23,23 @@ namespace WebApi.Controllers.v1;
 public class AdminController : ControllerBase
 {
     private readonly ISender _mediator;
-    private readonly ApplicationDbContext _dbContext;
+    private readonly ApplicationDbContext _behavioralContext;
+    private readonly NadenaIdentityDbContext _identityContext;
     private readonly IPaymentService _paymentService;
+    private readonly UserManager<ApplicationUser> _userManager;
 
-    public AdminController(ISender mediator, ApplicationDbContext dbContext, IPaymentService paymentService)
+    public AdminController(
+        ISender mediator,
+        ApplicationDbContext behavioralContext,
+        NadenaIdentityDbContext identityContext,
+        IPaymentService paymentService,
+        UserManager<ApplicationUser> userManager)
     {
         _mediator = mediator;
-        _dbContext = dbContext;
+        _behavioralContext = behavioralContext;
+        _identityContext = identityContext;
         _paymentService = paymentService;
+        _userManager = userManager;
     }
 
     // GET: api/v1/admin/audit-logs
@@ -97,7 +108,7 @@ public class AdminController : ControllerBase
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> GetFlaggedDatasets()
     {
-        var datasets = await _dbContext.Datasets
+        var datasets = await _behavioralContext.Datasets
             .Where(d => d.IntegrityStatus == IntegrityStatus.Flagged)
             .Select(d => new
             {
@@ -118,12 +129,12 @@ public class AdminController : ControllerBase
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> ClearFlag(int id)
     {
-        var dataset = await _dbContext.Datasets.FirstOrDefaultAsync(d => d.Id == id);
+        var dataset = await _behavioralContext.Datasets.FirstOrDefaultAsync(d => d.Id == id);
         if (dataset == null) return NotFound(new { message = "Dataset not found" });
 
         dataset.IntegrityStatus = IntegrityStatus.Verified;
         dataset.IntegrityReason = null;
-        await _dbContext.SaveChangesAsync();
+        await _behavioralContext.SaveChangesAsync();
 
         return Ok(new { message = "Dataset cleared." });
     }
@@ -133,12 +144,12 @@ public class AdminController : ControllerBase
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> RejectFlag(int id)
     {
-        var dataset = await _dbContext.Datasets.FirstOrDefaultAsync(d => d.Id == id);
+        var dataset = await _behavioralContext.Datasets.FirstOrDefaultAsync(d => d.Id == id);
         if (dataset == null) return NotFound(new { message = "Dataset not found" });
 
         dataset.IntegrityStatus = IntegrityStatus.Flagged;
         dataset.IntegrityReason = "Rejected by admin review";
-        await _dbContext.SaveChangesAsync();
+        await _behavioralContext.SaveChangesAsync();
 
         return Ok(new { message = "Dataset rejected and remains flagged." });
     }
@@ -147,7 +158,7 @@ public class AdminController : ControllerBase
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> PlatformWallet()
     {
-        var wallet = await _dbContext.Wallets.AsNoTracking().FirstOrDefaultAsync(w => w.OwnerId == "platform");
+        var wallet = await _identityContext.Wallets.AsNoTracking().FirstOrDefaultAsync(w => w.OwnerId == "platform");
         if (wallet == null)
         {
             return Ok(new { data = new { balance = 0m, pendingBalance = 0m, currency = "USD" } });
@@ -160,22 +171,22 @@ public class AdminController : ControllerBase
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> PendingPayouts()
     {
-        var payouts = await _dbContext.Transactions.AsNoTracking()
+        var payouts = await _identityContext.Transactions.AsNoTracking()
             .Where(t => t.Type == "ContributorPayout")
             .OrderByDescending(t => t.CreatedAt)
             .ToListAsync();
 
         var payoutWalletIds = payouts.Select(t => t.ToWalletId).Distinct().ToList();
-        var wallets = await _dbContext.Wallets.AsNoTracking()
+        var wallets = await _identityContext.Wallets.AsNoTracking()
             .Where(w => payoutWalletIds.Contains(w.Id))
             .ToDictionaryAsync(w => w.Id, w => w);
 
         var userIds = wallets.Values.Select(w => w.OwnerId).Distinct().ToList();
-        var users = await _dbContext.Users.AsNoTracking()
+        var users = await _userManager.Users.AsNoTracking()
             .Where(u => userIds.Contains(u.Id))
             .ToDictionaryAsync(u => u.Id, u => u.FullName);
 
-        var disbursed = await _dbContext.ContributorDisbursements.AsNoTracking()
+        var disbursed = await _identityContext.ContributorDisbursements.AsNoTracking()
             .Select(d => d.TransactionId)
             .ToListAsync();
 
@@ -216,7 +227,7 @@ public class AdminController : ControllerBase
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Users([FromQuery] string? role = null)
     {
-        var query = _dbContext.Users.AsNoTracking().AsQueryable();
+        var query = _userManager.Users.AsNoTracking().AsQueryable();
         if (!string.IsNullOrWhiteSpace(role))
         {
             query = query.Where(user => user.Role == role);
@@ -245,14 +256,14 @@ public class AdminController : ControllerBase
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> SuspendUser(string id)
     {
-        var user = await _dbContext.Users.FirstOrDefaultAsync(entry => entry.Id == id);
+        var user = await _userManager.FindByIdAsync(id);
         if (user == null)
         {
             return NotFound(new { message = "User not found." });
         }
 
         user.IsSuspended = true;
-        await _dbContext.SaveChangesAsync();
+        await _userManager.UpdateAsync(user);
         return Ok(new { message = "User suspended." });
     }
 
@@ -260,7 +271,7 @@ public class AdminController : ControllerBase
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> ReactivateUser(string id)
     {
-        var user = await _dbContext.Users.FirstOrDefaultAsync(entry => entry.Id == id);
+        var user = await _userManager.FindByIdAsync(id);
         if (user == null)
         {
             return NotFound(new { message = "User not found." });
@@ -268,7 +279,7 @@ public class AdminController : ControllerBase
 
         user.IsSuspended = false;
         user.DeletedAt = null;
-        await _dbContext.SaveChangesAsync();
+        await _userManager.UpdateAsync(user);
         return Ok(new { message = "User reactivated." });
     }
 
@@ -276,7 +287,7 @@ public class AdminController : ControllerBase
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> ConsentRecords([FromQuery] string? userId = null, [FromQuery] DateTime? from = null, [FromQuery] DateTime? to = null)
     {
-        var query = _dbContext.ConsentRecords.AsNoTracking().AsQueryable();
+        var query = _identityContext.ConsentRecords.AsNoTracking().AsQueryable();
         if (!string.IsNullOrWhiteSpace(userId))
         {
             query = query.Where(record => record.UserId == userId);
@@ -302,7 +313,7 @@ public class AdminController : ControllerBase
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> RevenueReport([FromQuery] DateTime? from = null, [FromQuery] DateTime? to = null, [FromQuery] bool exportCsv = false)
     {
-        var query = _dbContext.Transactions.AsNoTracking().AsQueryable();
+        var query = _identityContext.Transactions.AsNoTracking().AsQueryable();
         if (from.HasValue)
         {
             query = query.Where(transaction => transaction.CreatedAt >= from.Value);
@@ -334,7 +345,7 @@ public class AdminController : ControllerBase
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> DeletionRequests()
     {
-        var requests = await _dbContext.DeletionRequests.AsNoTracking()
+        var requests = await _identityContext.DeletionRequests.AsNoTracking()
             .OrderByDescending(request => request.RequestedAt)
             .ToListAsync();
         return Ok(new { data = requests });
@@ -344,7 +355,7 @@ public class AdminController : ControllerBase
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> ApproveDeletionRequest(Guid id)
     {
-        var request = await _dbContext.DeletionRequests.FirstOrDefaultAsync(entry => entry.Id == id);
+        var request = await _identityContext.DeletionRequests.FirstOrDefaultAsync(entry => entry.Id == id);
         if (request == null)
         {
             return NotFound(new { message = "Deletion request not found." });
@@ -357,20 +368,21 @@ public class AdminController : ControllerBase
 
         if (request.VolunteerId.HasValue)
         {
-            var volunteer = await _dbContext.Volunteers.FirstOrDefaultAsync(entry => entry.Id == request.VolunteerId.Value);
+            var volunteer = await _identityContext.Volunteers.FirstOrDefaultAsync(entry => entry.Id == request.VolunteerId.Value);
             if (volunteer != null)
             {
                 volunteer.Status = VolunteerStatus.Deleted;
             }
 
-            var affectedPurchases = await _dbContext.DatasetPurchases.Where(purchase => purchase.Status != "Cancelled").ToListAsync();
+            var affectedPurchases = await _behavioralContext.DatasetPurchases.Where(purchase => purchase.Status != "Cancelled").ToListAsync();
             foreach (var purchase in affectedPurchases)
             {
                 purchase.Status = "ReviewRequired";
             }
         }
 
-        await _dbContext.SaveChangesAsync();
+        await _identityContext.SaveChangesAsync();
+        await _behavioralContext.SaveChangesAsync();
         return Ok(new { message = "Deletion request approved." });
     }
 
@@ -378,7 +390,7 @@ public class AdminController : ControllerBase
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> DenyDeletionRequest(Guid id)
     {
-        var request = await _dbContext.DeletionRequests.FirstOrDefaultAsync(entry => entry.Id == id);
+        var request = await _identityContext.DeletionRequests.FirstOrDefaultAsync(entry => entry.Id == id);
         if (request == null)
         {
             return NotFound(new { message = "Deletion request not found." });
@@ -388,7 +400,7 @@ public class AdminController : ControllerBase
         request.ReviewedAt = DateTime.UtcNow;
         request.ReviewedByUserId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
         request.ReviewNotes = "Denied by admin";
-        await _dbContext.SaveChangesAsync();
+        await _identityContext.SaveChangesAsync();
         return Ok(new { message = "Deletion request denied." });
     }
 
@@ -396,7 +408,7 @@ public class AdminController : ControllerBase
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> EmailLogs()
     {
-        var emails = await _dbContext.EmailLogs.AsNoTracking()
+        var emails = await _identityContext.EmailLogs.AsNoTracking()
             .OrderByDescending(email => email.SentAt)
             .Take(500)
             .ToListAsync();

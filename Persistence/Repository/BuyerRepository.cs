@@ -5,9 +5,11 @@ using Persistence.Context;
 
 namespace Persistence.Repository;
 
-public class BuyerRepository : MyRepositoryAsync<Buyer>, IBuyerRepository
+public class BuyerRepository : NadenaRepositoryBase<Buyer>, IBuyerRepository
 {
-    public BuyerRepository(ApplicationDbContext dbContext) : base(dbContext)
+    private new NadenaIdentityDbContext DbContext => (NadenaIdentityDbContext)base.DbContext;
+
+    public BuyerRepository(NadenaIdentityDbContext dbContext) : base(dbContext)
     {
     }
 

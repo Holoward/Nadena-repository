@@ -1,5 +1,5 @@
 using Application.Interfaces;
-using Microsoft.Data.Sqlite;
+
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -13,11 +13,41 @@ public static class ServiceExtension
 {
     public static void AddPersistenceLayer(this IServiceCollection services, IConfiguration configuration, string contentRootPath)
     {
-        var connectionString = BuildSqliteConnectionString(configuration.GetConnectionString("DefaultConnection"), contentRootPath);
+        var connectionString = configuration.GetConnectionString("DefaultConnection");
+        var identityConnectionString = configuration.GetConnectionString("IdentityConnection");
+        
+        if (string.IsNullOrWhiteSpace(connectionString))
+            throw new InvalidOperationException("ConnectionStrings:DefaultConnection is required.");
+            
+        if (string.IsNullOrWhiteSpace(identityConnectionString))
+            throw new InvalidOperationException("ConnectionStrings:IdentityConnection is required so identity data stays separate from app data.");
+
+        if (string.Equals(connectionString, identityConnectionString, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("ConnectionStrings:IdentityConnection must be different from ConnectionStrings:DefaultConnection.");
+        }
+
+        var useInMemory = configuration.GetValue<bool>("UseInMemoryDatabase");
 
         services.AddDbContext<ApplicationDbContext>(options =>
-            options.UseSqlite(connectionString,
-                b => b.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName)));
+        {
+            if (useInMemory)
+                options.UseInMemoryDatabase("InMemoryAppDb");
+            else
+                options.UseNpgsql(connectionString, b => b.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName));
+        });
+
+        services.AddDbContext<NadenaIdentityDbContext>(options =>
+        {
+            if (useInMemory)
+                options.UseInMemoryDatabase("InMemoryIdentityDb");
+            else
+                options.UseNpgsql(identityConnectionString, b =>
+                {
+                    b.MigrationsAssembly(typeof(NadenaIdentityDbContext).Assembly.FullName);
+                    b.MigrationsHistoryTable("__EFMigrationsHistory_Identity");
+                });
+        });
 
         services.AddScoped(typeof(IRepositoryAsync<>), typeof(MyRepositoryAsync<>));
         services.AddScoped(typeof(IReadRepositoryAsync<>), typeof(MyRepositoryAsync<>));
@@ -75,27 +105,5 @@ public static class ServiceExtension
         services.AddHostedService<DrivePollingService>();
     }
 
-    private static string BuildSqliteConnectionString(string? configuredConnectionString, string contentRootPath)
-    {
-        var sqliteBuilder = new SqliteConnectionStringBuilder(configuredConnectionString);
-        if (string.IsNullOrWhiteSpace(sqliteBuilder.DataSource))
-        {
-            sqliteBuilder.DataSource = Path.Combine(contentRootPath, "..", "OnionArchitecture.db");
-            return sqliteBuilder.ToString();
-        }
 
-        if (Path.IsPathRooted(sqliteBuilder.DataSource))
-        {
-            return sqliteBuilder.ToString();
-        }
-
-        var normalizedDataSource = sqliteBuilder.DataSource.Replace('\\', '/');
-        if (normalizedDataSource.StartsWith("WebApi/", StringComparison.OrdinalIgnoreCase))
-        {
-            normalizedDataSource = normalizedDataSource["WebApi/".Length..];
-        }
-
-        sqliteBuilder.DataSource = Path.GetFullPath(normalizedDataSource, contentRootPath);
-        return sqliteBuilder.ToString();
-    }
 }

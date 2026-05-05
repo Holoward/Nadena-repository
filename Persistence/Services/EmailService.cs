@@ -17,9 +17,9 @@ public class EmailService : IEmailService
 {
     private readonly EmailSettings _emailSettings;
     private readonly ILogger<EmailService> _logger;
-    private readonly ApplicationDbContext _dbContext;
+    private readonly NadenaIdentityDbContext _dbContext;
 
-    public EmailService(IOptions<EmailSettings> emailSettings, ILogger<EmailService> logger, ApplicationDbContext dbContext)
+    public EmailService(IOptions<EmailSettings> emailSettings, ILogger<EmailService> logger, NadenaIdentityDbContext dbContext)
     {
         _emailSettings = emailSettings.Value;
         _logger = logger;

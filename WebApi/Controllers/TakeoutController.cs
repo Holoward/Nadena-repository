@@ -13,7 +13,7 @@ namespace WebApi.Controllers;
 [ApiController]
 [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
 [EnableRateLimiting("api")]
-[Route("api/v{version:apiVersion}/[controller]")]
+[Route("api/v{version:apiVersion}/TakeoutLegacy")]
 public sealed class TakeoutController : ControllerBase
 {
     private readonly ISender _sender;

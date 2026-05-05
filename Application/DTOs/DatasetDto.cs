@@ -6,6 +6,7 @@ public class DatasetDto
     public string Title { get; set; }
     public string Description { get; set; }
     public int VolunteerCount { get; set; }
+    public int CommentCount { get; set; }
     public decimal Price { get; set; }
     public string Status { get; set; }
     public string BuyerReference { get; set; }

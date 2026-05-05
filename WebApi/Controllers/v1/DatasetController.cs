@@ -1,12 +1,10 @@
 using System.Text.Json;
 using Application.Common;
+using Application.DTOs;
 using Application.Features.Datasets.Commands.CreateDataset;
 using Application.Features.Datasets.Commands.UpdateDataset;
-using Application.Features.Datasets.DTOs;
 using Application.Features.Datasets.Queries.GetAllDatasets;
 using Application.Features.Datasets.Queries.GetDatasetById;
-using Application.Features.Reviews.Commands.CreateReview;
-using Application.Features.Reviews.Queries.GetDatasetReviews;
 using Application.Interfaces;
 using Application.Wrappers;
 using Domain.Entities;
@@ -176,33 +174,6 @@ public class DatasetController : ControllerBase
         return Ok(new ServiceResponse<DatasetAnalysisDto>(analysisResult));
     }
 
-    // POST: api/v1/Dataset/{id}/review
-    [HttpPost("{id}/review")]
-    [Authorize(Roles = "Data Client")]
-    public async Task<IActionResult> CreateReview(int id, CreateReviewCommand command)
-    {
-        if (id != command.DatasetId)
-        {
-            return BadRequest(new ServiceResponse<string>("Dataset ID mismatch"));
-        }
-
-        var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-        if (!string.IsNullOrEmpty(userId))
-        {
-            command.BuyerId = Guid.Parse(userId);
-        }
-
-        return Ok(await _mediator.Send(command));
-    }
-
-    // GET: api/v1/Dataset/{id}/reviews
-    [HttpGet("{id}/reviews")]
-    [AllowAnonymous]
-    public async Task<IActionResult> GetReviews(int id)
-    {
-        return Ok(await _mediator.Send(new GetDatasetReviewsQuery { DatasetId = id }));
-    }
-
     // GET: api/v1/Dataset/{id}/stream
     [HttpGet("{id}/stream")]
     [Authorize(Roles = "Data Client")]
@@ -327,4 +298,11 @@ public class DatasetController : ControllerBase
 
         return false;
     }
+}
+
+public class DatasetAnalysisDto
+{
+    public string Summary { get; set; } = string.Empty;
+    public DateTime AnalyzedAt { get; set; }
+    public int CommentCount { get; set; }
 }
