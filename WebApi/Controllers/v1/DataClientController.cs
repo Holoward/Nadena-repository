@@ -1,0 +1,475 @@
+using Application.Common;
+using Application.Features.Buyers.Commands.CreateCheckoutSession;
+using Application.Features.Buyers.Commands.CreateBuyer;
+using Application.Features.Buyers.Queries.GetAllBuyers;
+using Application.Features.Buyers.Queries.GetBuyerByUserId;
+using Application.Interfaces;
+using MediatR;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.EntityFrameworkCore;
+using Persistence.Context;
+using Persistence.Models;
+using System.Text.Json;
+
+namespace WebApi.Controllers.v1;
+
+[ApiVersion("1.0")]
+[ApiController]
+[Authorize]
+[EnableRateLimiting("api")]
+[Route("api/v{version:apiVersion}/[controller]")]
+public class DataClientController : ControllerBase
+{
+    private readonly ISender _mediator;
+    private readonly ICurrentUserService _currentUserService;
+    private readonly IPaymentService _paymentService;
+    private readonly ApplicationDbContext _behavioralContext;
+    private readonly NadenaIdentityDbContext _identityContext;
+    private readonly IWebHostEnvironment _environment;
+    private readonly ILicensePdfService _licensePdfService;
+    private readonly IEmailService _emailService;
+    private readonly UserManager<ApplicationUser> _userManager;
+    private readonly IDatasetStorageService _datasetStorageService;
+
+    public DataClientController(
+        ISender mediator,
+        ICurrentUserService currentUserService,
+        IPaymentService paymentService,
+        ApplicationDbContext behavioralContext,
+        NadenaIdentityDbContext identityContext,
+        IWebHostEnvironment environment,
+        ILicensePdfService licensePdfService,
+        IEmailService emailService,
+        UserManager<ApplicationUser> userManager,
+        IDatasetStorageService datasetStorageService)
+    {
+        _mediator = mediator;
+        _currentUserService = currentUserService;
+        _paymentService = paymentService;
+        _behavioralContext = behavioralContext;
+        _identityContext = identityContext;
+        _environment = environment;
+        _licensePdfService = licensePdfService;
+        _emailService = emailService;
+        _userManager = userManager;
+        _datasetStorageService = datasetStorageService;
+    }
+
+    // GET: api/v1/DataClient
+    [HttpGet]
+    [Authorize(Roles = "Data Client,Admin")]
+    public async Task<IActionResult> Get([FromQuery] int page = 1, int pageSize = 20)
+    {
+        var paginationParams = new PaginationParams { Page = page, PageSize = pageSize };
+        return Ok(await _mediator.Send(new GetAllBuyersQuery { PaginationParams = paginationParams }));
+    }
+
+    // GET: api/v1/DataClient/user/{userId}
+    [HttpGet("user/{userId}")]
+    [Authorize(Roles = "Data Client,Admin")]
+    public async Task<IActionResult> GetByUserId(Guid userId)
+    {
+        var currentUserId = _currentUserService.GetCurrentUserId();
+        var isAdmin = User.IsInRole("Admin");
+
+        if (!isAdmin && currentUserId != userId.ToString())
+        {
+            return Forbid();
+        }
+
+        return Ok(await _mediator.Send(new GetBuyerByUserIdQuery { UserId = userId }));
+    }
+
+    // POST: api/v1/DataClient/setup
+    [HttpPost("setup")]
+    [Authorize(Roles = "Data Client")]
+    public async Task<IActionResult> SetupData([FromBody] Application.Features.Buyers.Commands.SetupBuyerData.SetupBuyerDataCommand command)
+    {
+        var userId = _currentUserService.GetCurrentUserId();
+        if (string.IsNullOrEmpty(userId))
+        {
+            return Unauthorized(new { message = "User not authenticated" });
+        }
+
+        command.UserId = userId;
+        return Ok(await _mediator.Send(command));
+    }
+
+    // POST: api/v1/DataClient — Admin only
+    [HttpPost]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> Post(CreateBuyerCommand command)
+        => Ok(await _mediator.Send(command));
+
+    // POST: api/v1/DataClient/checkout
+    [HttpPost("checkout")]
+    [Authorize(Roles = "Data Client")]
+    public async Task<IActionResult> Checkout([FromBody] DataClientCheckoutRequest request)
+    {
+        var buyerUserId = _currentUserService.GetCurrentUserId();
+        var idempotencyKey = Request.Headers["Idempotency-Key"].FirstOrDefault();
+        var user = await _userManager.FindByIdAsync(buyerUserId);
+
+        if (string.IsNullOrWhiteSpace(idempotencyKey))
+        {
+            return BadRequest(new { message = "Idempotency-Key header is required." });
+        }
+
+        if (user == null)
+        {
+            return Unauthorized(new { message = "User not found." });
+        }
+
+        if (!user.EmailConfirmed)
+        {
+            return BadRequest(new { message = "Please verify your email before making purchases." });
+        }
+
+        var dataset = await _behavioralContext.Datasets.FindAsync(request.DatasetId);
+        if (dataset == null)
+        {
+            return NotFound(new { message = "Dataset not found." });
+        }
+
+        var response = await _paymentService.ProcessPurchaseAsync(
+            dataClientUserId: Guid.Parse(buyerUserId),
+            datasetId: request.DatasetId,
+            price: dataset.Price,
+            billingType: request.BillingType,
+            idempotencyKey: idempotencyKey,
+            contributorShareNow: request.ContributorShareNow);
+
+        if (!response.Success)
+        {
+            return BadRequest(new { message = response.Message });
+        }
+
+        return Ok(new { message = "Purchase confirmed", transactionId = response.Data });
+    }
+
+    [HttpGet("wallet")]
+    [Authorize(Roles = "Data Client")]
+    public async Task<IActionResult> Wallet()
+    {
+        var buyerUserId = _currentUserService.GetCurrentUserId();
+        var wallet = await _identityContext.Wallets.AsNoTracking().FirstOrDefaultAsync(w => w.OwnerId == buyerUserId);
+        if (wallet == null)
+        {
+            return Ok(new { data = new { balance = 0m, pendingBalance = 0m, currency = "USD" } });
+        }
+
+        return Ok(new { data = wallet });
+    }
+
+    [HttpGet("transactions")]
+    [Authorize(Roles = "Data Client")]
+    public async Task<IActionResult> Transactions()
+    {
+        var buyerUserId = _currentUserService.GetCurrentUserId();
+        var wallet = await _identityContext.Wallets.AsNoTracking().FirstOrDefaultAsync(w => w.OwnerId == buyerUserId);
+        if (wallet == null)
+        {
+            return Ok(new { data = Array.Empty<object>() });
+        }
+
+        var transactions = await _identityContext.Transactions.AsNoTracking()
+            .Where(t => t.FromWalletId == wallet.Id || t.ToWalletId == wallet.Id)
+            .OrderByDescending(t => t.CreatedAt)
+            .ToListAsync();
+
+        return Ok(new { data = transactions });
+    }
+
+    [HttpPost("purchases")]
+    [Authorize(Roles = "Data Client")]
+    public async Task<IActionResult> PurchaseDataset([FromBody] DataClientPurchaseRequest request)
+    {
+        var buyerUserId = _currentUserService.GetCurrentUserId();
+        var idempotencyKey = Request.Headers["Idempotency-Key"].FirstOrDefault();
+        if (string.IsNullOrWhiteSpace(idempotencyKey))
+        {
+            return BadRequest(new { message = "Idempotency-Key header is required." });
+        }
+
+        var user = await _userManager.FindByIdAsync(buyerUserId);
+        if (user == null)
+        {
+            return Unauthorized();
+        }
+
+        if (!user.EmailConfirmed)
+        {
+            return BadRequest(new { message = "Please verify your email before making purchases." });
+        }
+
+        // Create a Dataset entity so the purchase references a real record
+        var datasetFileId = Guid.NewGuid();
+        var computedPrice = CalculatePrice(request.RecordCount, request.PurchaseType ?? "OneTime");
+        var dataset = new Domain.Entities.Dataset
+        {
+            Title = $"Custom Dataset - {string.Join(", ", request.DataSources ?? new List<string>())}",
+            Description = $"Dataset purchased by buyer {buyerUserId}",
+            VolunteerCount = 0,
+            CommentCount = 0,
+            Price = computedPrice,
+            Status = "Active",
+            BuyerReference = buyerUserId,
+            DateRangeStart = request.DateRangeStart,
+            DateRangeEnd = request.DateRangeEnd,
+            UpdateFrequency = request.PurchaseType ?? "OneTime",
+            PricingModel = request.PurchaseType ?? "OneTime",
+            DataFormat = "CSV"
+        };
+        _behavioralContext.Datasets.Add(dataset);
+        await _behavioralContext.SaveChangesAsync();
+        var datasetId = datasetFileId; // file uses a stable Guid; DB record uses auto int Id
+        var response = await _paymentService.ProcessPurchaseAsync(Guid.Parse(buyerUserId), datasetId, computedPrice, request.PurchaseType ?? "OneTime", idempotencyKey, request.ContributorShareNow);
+        if (!response.Success)
+        {
+            return BadRequest(new { message = response.Message });
+        }
+
+        var downloadToken = Guid.NewGuid();
+        var frontendBaseUrl = $"{Request.Scheme}://{Request.Host}";
+        var downloadUrl = $"{frontendBaseUrl}/api/v1/Dataset/{datasetId}/download?token={downloadToken}";
+        var invoiceNumber = $"INV-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString("N")[..8].ToUpperInvariant()}";
+        var purchase = new Domain.Entities.DatasetPurchase
+        {
+            Id = Guid.NewGuid(),
+            BuyerId = Guid.Parse(buyerUserId),
+            DatasetId = datasetId,
+            StripeSessionId = response.Data ?? string.Empty,
+            AmountPaid = computedPrice,
+            PurchasedAt = DateTime.UtcNow,
+            DownloadUrl = downloadUrl,
+            DownloadExpiry = DateTime.UtcNow.AddHours(1),
+            PurchaseType = request.PurchaseType == "OneTime" ? "One-time" : "Recurring",
+            BillingFrequency = request.PurchaseType ?? "OneTime",
+            Status = "Ready",
+            RecordCount = request.RecordCount,
+            DataSources = string.Join(", ", request.DataSources ?? new List<string>()),
+            DateRangeStart = request.DateRangeStart,
+            DateRangeEnd = request.DateRangeEnd,
+            InvoiceNumber = invoiceNumber,
+            RefreshCount = 1,
+            NextRefreshDate = request.PurchaseType == "OneTime" ? null : GetNextRefreshDate(request.PurchaseType ?? "OneTime"),
+            LastRefreshedAt = DateTime.UtcNow,
+            MetricsHistoryJson = JsonSerializer.Serialize(new[]
+            {
+                new { date = DateTime.UtcNow.ToString("yyyy-MM-dd"), count = request.RecordCount }
+            })
+        };
+
+        _behavioralContext.DatasetPurchases.Add(purchase);
+
+        if (request.PurchaseType != "OneTime")
+        {
+            _behavioralContext.DatasetSubscriptions.Add(new Domain.Entities.DatasetSubscription
+            {
+                DatasetId = datasetId,
+                BuyerId = Guid.Parse(buyerUserId),
+                StripeSubscriptionId = response.Data ?? string.Empty,
+                PricingModel = request.PurchaseType ?? "OneTime",
+                StartDate = DateTime.UtcNow,
+                NextDeliveryDate = purchase.NextRefreshDate,
+                IsActive = true,
+                RefreshCount = 1,
+                LastDeliveredAt = DateTime.UtcNow
+            });
+        }
+
+        await WriteDatasetFileAsync(datasetId, request);
+        await _behavioralContext.SaveChangesAsync();
+
+        return Ok(new
+        {
+            message = "Purchase confirmed",
+            data = new
+            {
+                purchase.Id,
+                purchase.InvoiceNumber,
+                purchase.DownloadUrl,
+                purchase.AmountPaid
+            }
+        });
+    }
+
+    [HttpPost("request-custom-quote")]
+    [Authorize(Roles = "Data Client")]
+    public async Task<IActionResult> RequestCustomQuote([FromBody] CustomQuoteRequest request)
+    {
+        var user = await _userManager.FindByIdAsync(_currentUserService.GetCurrentUserId() ?? string.Empty);
+        if (user == null)
+        {
+            return Unauthorized();
+        }
+
+        await _emailService.SendCustomQuoteRequestAsync(user.Email ?? user.UserName ?? "client@nadena.local", request.DatasetName, request.RecordCount);
+        return Ok(new { message = "Custom quote request captured." });
+    }
+
+    [HttpGet("my-datasets")]
+    [Authorize(Roles = "Data Client")]
+    public async Task<IActionResult> MyDatasets()
+    {
+        var buyerUserId = _currentUserService.GetCurrentUserId();
+        var purchases = await _behavioralContext.DatasetPurchases.AsNoTracking()
+            .Where(purchase => purchase.BuyerId == Guid.Parse(buyerUserId))
+            .OrderByDescending(purchase => purchase.PurchasedAt)
+            .ToListAsync();
+
+        return Ok(new { data = purchases });
+    }
+
+    [HttpPost("my-datasets/{purchaseId:guid}/cancel")]
+    [Authorize(Roles = "Data Client")]
+    public async Task<IActionResult> CancelSubscription(Guid purchaseId)
+    {
+        var buyerUserId = _currentUserService.GetCurrentUserId();
+        var purchase = await _behavioralContext.DatasetPurchases.FirstOrDefaultAsync(entry => entry.Id == purchaseId && entry.BuyerId == Guid.Parse(buyerUserId));
+        if (purchase == null)
+        {
+            return NotFound(new { message = "Purchase not found." });
+        }
+
+        var subscription = await _behavioralContext.DatasetSubscriptions.FirstOrDefaultAsync(entry => entry.DatasetId == purchase.DatasetId && entry.BuyerId == purchase.BuyerId && entry.IsActive);
+        if (subscription == null)
+        {
+            return BadRequest(new { message = "No active subscription found." });
+        }
+
+        subscription.IsActive = false;
+        purchase.Status = "Cancelled";
+        await _behavioralContext.SaveChangesAsync();
+        return Ok(new { message = "Subscription cancelled." });
+    }
+
+    [HttpGet("my-datasets/{purchaseId:guid}/invoice")]
+    [Authorize(Roles = "Data Client")]
+    public async Task<IActionResult> Invoice(Guid purchaseId)
+    {
+        var buyerUserId = _currentUserService.GetCurrentUserId();
+        var purchase = await _behavioralContext.DatasetPurchases.AsNoTracking().FirstOrDefaultAsync(entry => entry.Id == purchaseId && entry.BuyerId == Guid.Parse(buyerUserId));
+        if (purchase == null)
+        {
+            return NotFound(new { message = "Purchase not found." });
+        }
+
+        var user = await _userManager.FindByIdAsync(buyerUserId);
+        var pdf = _licensePdfService.GenerateLicensePdf(user?.FullName ?? "Data Client", user?.CompanyName ?? string.Empty, 0, purchase.PurchasedAt);
+        return File(pdf, "application/pdf", $"{purchase.InvoiceNumber}.pdf");
+    }
+
+    [HttpPut("my-datasets/{purchaseId:guid}/delivery-endpoint")]
+    [Authorize(Roles = "Data Client")]
+    public async Task<IActionResult> UpdateDeliveryEndpoint(Guid purchaseId, [FromBody] UpdateDeliveryEndpointRequest request)
+    {
+        var buyerUserId = _currentUserService.GetCurrentUserId();
+        var purchase = await _behavioralContext.DatasetPurchases.FirstOrDefaultAsync(entry => entry.Id == purchaseId && entry.BuyerId == Guid.Parse(buyerUserId));
+        if (purchase == null)
+        {
+            return NotFound(new { message = "Purchase not found." });
+        }
+
+        purchase.DeliveryEndpoint = request.DeliveryEndpoint;
+        await _behavioralContext.SaveChangesAsync();
+        return Ok(new { message = "Delivery endpoint updated.", deliveryEndpoint = purchase.DeliveryEndpoint });
+    }
+
+    [HttpPost("my-datasets/{purchaseId:guid}/share")]
+    [Authorize(Roles = "Data Client")]
+    public async Task<IActionResult> ShareDataset(Guid purchaseId, [FromBody] ShareDatasetRequest request)
+    {
+        var buyerUserId = _currentUserService.GetCurrentUserId();
+        var purchase = await _behavioralContext.DatasetPurchases.AsNoTracking().FirstOrDefaultAsync(entry => entry.Id == purchaseId && entry.BuyerId == Guid.Parse(buyerUserId));
+        if (purchase == null)
+        {
+            return NotFound(new { message = "Purchase not found." });
+        }
+
+        var grant = new Domain.Entities.DatasetAccessGrant
+        {
+            Id = Guid.NewGuid(),
+            DatasetPurchaseId = purchaseId,
+            GrantedByUserId = buyerUserId,
+            TeammateEmail = request.Email,
+            ExpiresAt = DateTime.UtcNow.AddDays(30)
+        };
+
+        _behavioralContext.DatasetAccessGrants.Add(grant);
+        await _behavioralContext.SaveChangesAsync();
+        return Ok(new { message = "Dataset access granted.", data = grant });
+    }
+
+    private static decimal CalculatePrice(int recordCount, string purchaseType)
+    {
+        var baseUnits = Math.Max(recordCount, 100) / 1000m;
+        var basePrice = baseUnits * 2.00m;
+        return purchaseType switch
+        {
+            "Daily" => Math.Round(basePrice * 0.8m * 30m, 2),
+            "Weekly" => Math.Round(basePrice * 0.75m * 4m, 2),
+            "Monthly" => Math.Round(basePrice * 0.7m, 2),
+            "Annual" => Math.Round(basePrice * 0.6m * 12m, 2),
+            _ => Math.Round(basePrice, 2)
+        };
+    }
+
+    private static DateTime? GetNextRefreshDate(string purchaseType) => purchaseType switch
+    {
+        "Daily" => DateTime.UtcNow.AddDays(1),
+        "Weekly" => DateTime.UtcNow.AddDays(7),
+        "Monthly" => DateTime.UtcNow.AddMonths(1),
+        "Annual" => DateTime.UtcNow.AddYears(1),
+        _ => null
+    };
+
+    private async Task WriteDatasetFileAsync(Guid datasetId, DataClientPurchaseRequest request)
+    {
+        await _datasetStorageService.WriteDatasetFileAsync(
+            datasetId,
+            request.DataSources ?? new List<string>(),
+            request.Category ?? "General",
+            request.DateRangeStart,
+            request.DateRangeEnd
+        );
+    }
+}
+
+public class DataClientCheckoutRequest
+{
+    public Guid DatasetId { get; set; }
+    public string BillingType { get; set; } = "OneTime";
+    public bool ContributorShareNow { get; set; } = true;
+}
+
+public class DataClientPurchaseRequest
+{
+    public string PoolName { get; set; } = string.Empty;
+    public string? Category { get; set; }
+    public string PurchaseType { get; set; } = "OneTime";
+    public List<string>? DataSources { get; set; }
+    public DateTime? DateRangeStart { get; set; }
+    public DateTime? DateRangeEnd { get; set; }
+    public int RecordCount { get; set; } = 1000;
+    public bool ContributorShareNow { get; set; } = true;
+}
+
+public class ShareDatasetRequest
+{
+    public string Email { get; set; } = string.Empty;
+}
+
+public class CustomQuoteRequest
+{
+    public string DatasetName { get; set; } = string.Empty;
+    public int RecordCount { get; set; }
+}
+
+public class UpdateDeliveryEndpointRequest
+{
+    public string? DeliveryEndpoint { get; set; }
+}

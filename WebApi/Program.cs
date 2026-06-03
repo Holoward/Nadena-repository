@@ -1,0 +1,347 @@
+using Application;
+using Application.Interfaces;
+using Persistence;
+using Persistence.Seeders;
+using Shared.ServiceExtensions;
+using WebApi.Extensions;
+using WebApi.Services;
+using Serilog;
+using WebApi.Middlewares;
+using Stripe;
+using Microsoft.AspNetCore.RateLimiting;
+using System.Threading.RateLimiting;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using HealthChecks.UI.Client;
+using Persistence.Context;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
+using Persistence.Models;
+using Domain.Entities;
+using System.Text.Json;
+using Application.Wrappers;
+using WebApi.Filters;
+
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Host.UseSerilog((context, services, configuration) => configuration
+    .ReadFrom.Configuration(context.Configuration)
+    .ReadFrom.Services(services)
+    .Enrich.FromLogContext()
+    .WriteTo.Console()
+    .WriteTo.File("Logs/log-.txt", rollingInterval: RollingInterval.Day, retainedFileCountLimit: 7));
+
+// Add services to the container.
+
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddMemoryCache();
+builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
+builder.Services.AddScoped<RequireDataContributorOnboardingFilter>();
+builder.Services.AddHttpClient();
+
+builder.Services.AddControllersWithViews();
+builder.Services.AddSwaggerGen();
+builder.Services.AddApplicationLayer();
+builder.Services.AddPersistenceLayer(builder.Configuration, builder.Environment.IsProduction());
+builder.Services.AddSharedLayer();
+builder.Services.AddIdentityLayer(builder.Configuration, builder.Environment);
+builder.Services.Configure<Application.Settings.StripeSettings>(options =>
+{
+    var nadenaSection = builder.Configuration.GetSection("NadenaSettings");
+    options.SecretKey = nadenaSection["StripeSecretKey"] ?? string.Empty;
+    options.WebhookSecret = nadenaSection["StripeWebhookSecret"] ?? string.Empty;
+    options.FrontendUrl = nadenaSection["FrontendUrl"] ?? string.Empty;
+});
+builder.Services.Configure<Application.Settings.EmailSettings>(builder.Configuration.GetSection("NadenaSettings"));
+builder.Services.AddApiVersioning(config =>
+{
+    config.DefaultApiVersion = new Microsoft.AspNetCore.Mvc.ApiVersion(1, 0);
+    config.AssumeDefaultVersionWhenUnspecified = true;
+    config.ReportApiVersions = true;
+});
+
+// Health checks
+builder.Services.AddHealthChecks()
+    .AddDbContextCheck<ApplicationDbContext>("database")
+    .AddDbContextCheck<NadenaIdentityDbContext>("identity-database")
+    .AddUrlGroup(new Uri("https://api.stripe.com"), "stripe-api", tags: ["external"]);
+
+// Register StripeClient
+var stripeSecretKey = builder.Configuration["NadenaSettings:StripeSecretKey"];
+if (string.IsNullOrWhiteSpace(stripeSecretKey))
+    throw new InvalidOperationException("StripeSecretKey is not configured. Please set NadenaSettings:StripeSecretKey in production.");
+builder.Services.AddSingleton(new Stripe.StripeClient(stripeSecretKey));
+Stripe.StripeConfiguration.ApiKey = stripeSecretKey;
+
+var disableRateLimiting = builder.Configuration["DisableRateLimiting"] == "true";
+if (!disableRateLimiting)
+{
+// Add rate limiting
+builder.Services.AddRateLimiter(options => {
+    // Auth endpoints — strict (5 requests per 15 minutes)
+    options.AddPolicy("auth", context => RateLimitPartition.GetFixedWindowLimiter(
+        partitionKey: context.User.Identity?.Name ?? context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        factory: partition => new FixedWindowRateLimiterOptions
+        {
+            AutoReplenishment = true,
+            PermitLimit = 5,
+            Window = TimeSpan.FromMinutes(15),
+            QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+            QueueLimit = 0
+        }));
+    // API endpoints — moderate (60 requests per minute)
+    options.AddPolicy("api", context => RateLimitPartition.GetFixedWindowLimiter(
+        partitionKey: context.User.Identity?.Name ?? context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        factory: partition => new FixedWindowRateLimiterOptions
+        {
+            AutoReplenishment = true,
+            PermitLimit = 60,
+            Window = TimeSpan.FromMinutes(1),
+            QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+            QueueLimit = 10
+        }));
+    // Upload endpoint — very strict (10 uploads per 10 minutes)
+    options.AddPolicy("upload", context => RateLimitPartition.GetFixedWindowLimiter(
+        partitionKey: context.User.Identity?.Name ?? context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        factory: partition => new FixedWindowRateLimiterOptions
+        {
+            AutoReplenishment = true,
+            PermitLimit = 10,
+            Window = TimeSpan.FromMinutes(10),
+            QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+            QueueLimit = 0
+        }));
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.OnRejected = async (context, cancellationToken) =>
+    {
+        context.HttpContext.Response.ContentType = "application/json";
+
+        // Best-effort Retry-After hint if available
+        if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
+        {
+            context.HttpContext.Response.Headers.RetryAfter = ((int)Math.Ceiling(retryAfter.TotalSeconds)).ToString();
+        }
+
+        var payload = JsonSerializer.Serialize(new ServiceResponse<string>("Too many requests. Please wait and try again."));
+        await context.HttpContext.Response.WriteAsync(payload, cancellationToken);
+    };
+});
+}
+
+// CORS configuration
+builder.Services.AddCors(options => {
+    options.AddPolicy("Development", policy => {
+        policy.WithOrigins("http://localhost:44391")
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .AllowCredentials();
+    });
+    options.AddPolicy("Production", policy => {
+        var frontendUrl = builder.Configuration["NadenaSettings:FrontendUrl"] ?? "https://nadena.com";
+        policy.WithOrigins(frontendUrl)
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .AllowCredentials();
+    });
+    options.AddPolicy("ChromeExtension", policy => {
+        var extensionId = builder.Configuration["NadenaSettings:ChromeExtensionId"] ?? "chrome-extension://default-id";
+        policy.WithOrigins(extensionId)
+              .AllowAnyHeader()
+              .AllowAnyMethod();
+    });
+});
+
+var app = builder.Build();
+
+using (var scope = app.Services.CreateScope())
+{
+    var services = scope.ServiceProvider;
+    var dbContext = services.GetRequiredService<ApplicationDbContext>();
+    var identityDbContext = services.GetRequiredService<NadenaIdentityDbContext>();
+
+    if (identityDbContext.Database.IsRelational())
+    {
+        if (app.Environment.IsDevelopment())
+        {
+            await identityDbContext.Database.MigrateAsync();
+            await dbContext.Database.MigrateAsync();
+        }
+    }
+    else
+    {
+        await identityDbContext.Database.EnsureCreatedAsync();
+        await dbContext.Database.EnsureCreatedAsync();
+    }
+    await SeedIdentityDataAsync(services, builder.Configuration, identityDbContext);
+    await SeedPlatformWalletAsync(identityDbContext);
+    await DataPoolSeeder.SeedDataPoolsAsync(dbContext);
+    await SeedMarketplaceDataAsync(dbContext);
+}
+
+// Configure the HTTP request pipeline.
+if (!app.Environment.IsDevelopment())
+{
+    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
+    app.UseHsts();
+}
+
+app.UseMiddleware<ErrorHandlerMiddleware>();
+
+app.UseHttpsRedirection();
+app.UseStaticFiles();
+
+// Apply CORS middleware based on environment
+if (app.Environment.IsDevelopment())
+    app.UseCors("Development");
+else
+    app.UseCors("Production");
+
+app.UseSerilogRequestLogging();
+
+
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI(c =>
+    {
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "Onion Architecture API V1");
+    });
+}
+
+app.UseSecurityHeaders();
+
+app.UseRouting();
+
+app.MapHealthChecks("/api/test-health", new HealthCheckOptions {
+    Predicate = check => !check.Tags.Contains("external"),
+    ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
+});
+
+app.MapHealthChecks("/health/ready", new HealthCheckOptions {
+    Predicate = check => !check.Tags.Contains("external")
+});
+
+app.MapHealthChecks("/health/external", new HealthCheckOptions {
+    Predicate = check => check.Tags.Contains("external"),
+    ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
+});
+
+if (!disableRateLimiting) app.UseRateLimiter();
+
+app.UseAuthentication();
+app.UseAuthorization();
+
+
+app.MapControllerRoute(
+    name: "default",
+    pattern: "{controller}/{action=Index}/{id?}");
+
+app.MapFallbackToFile("index.html");
+;
+
+app.Run();
+
+static async Task SeedIdentityDataAsync(IServiceProvider services, IConfiguration configuration, NadenaIdentityDbContext identityDbContext)
+{
+    var userManager = services.GetRequiredService<UserManager<ApplicationUser>>();
+    var roleManager = services.GetRequiredService<RoleManager<IdentityRole>>();
+
+    foreach (var roleName in new[] { "Admin", "Data Client", "Data Contributor" })
+    {
+        if (!await roleManager.RoleExistsAsync(roleName))
+        {
+            await roleManager.CreateAsync(new IdentityRole(roleName));
+        }
+    }
+
+    var adminEmail = configuration["NadenaSettings:AdminEmail"] ?? "admin@nadena.com";
+    var adminPassword = configuration["NadenaSettings:AdminSeedPassword"]
+        ?? throw new InvalidOperationException("NadenaSettings:AdminSeedPassword must be set in configuration. See appsettings.example.json.");
+
+    var adminUser = await userManager.FindByEmailAsync(adminEmail);
+    if (adminUser == null)
+    {
+        adminUser = new ApplicationUser
+        {
+            Email = adminEmail,
+            UserName = adminEmail,
+            FullName = "Nadena Admin",
+            Role = "Admin",
+            SecurityStamp = Guid.NewGuid().ToString()
+        };
+
+        var createResult = await userManager.CreateAsync(adminUser, adminPassword);
+        if (!createResult.Succeeded)
+        {
+            throw new InvalidOperationException($"Failed to seed admin user: {string.Join(", ", createResult.Errors.Select(error => error.Description))}");
+        }
+    }
+    else if (!string.Equals(adminUser.Role, "Admin", StringComparison.Ordinal))
+    {
+        adminUser.Role = "Admin";
+        await userManager.UpdateAsync(adminUser);
+    }
+
+    if (!await userManager.IsInRoleAsync(adminUser, "Admin"))
+    {
+        await userManager.AddToRoleAsync(adminUser, "Admin");
+    }
+
+    var staleBuyer = await identityDbContext.Buyers.FirstOrDefaultAsync(buyer => buyer.UserId == adminUser.Id);
+    if (staleBuyer != null)
+    {
+        identityDbContext.Buyers.Remove(staleBuyer);
+        await identityDbContext.SaveChangesAsync();
+    }
+}
+
+static async Task SeedMarketplaceDataAsync(ApplicationDbContext dbContext)
+{
+    // Update DataPool record counts based on WatchEvents
+    // YoutubeComment seeding removed — data now arrives via Google Takeout uploads
+    var activePools = await dbContext.DataPools
+        .Where(pool => pool.IsActive)
+        .OrderBy(pool => pool.Id)
+        .ToListAsync();
+
+    if (!activePools.Any())
+        return;
+
+    var watchEventCount = await dbContext.WatchEvents.LongCountAsync();
+
+    foreach (var pool in activePools)
+    {
+        if (string.IsNullOrWhiteSpace(pool.SourceTable))
+            pool.SourceTable = "WatchEvents";
+
+        pool.ApproximateRecordCount = Math.Max(pool.ApproximateRecordCount, watchEventCount);
+    }
+
+    await dbContext.SaveChangesAsync();
+}
+
+static async Task SeedPlatformWalletAsync(NadenaIdentityDbContext identityDbContext)
+{
+    var exists = await identityDbContext.Wallets.AnyAsync(wallet => wallet.OwnerId == "platform");
+    if (exists)
+    {
+        return;
+    }
+
+    identityDbContext.Wallets.Add(new Wallet
+    {
+        Id = Guid.NewGuid(),
+        OwnerId = "platform",
+        OwnerType = "Platform",
+        Currency = "USD",
+        Balance = 0m,
+        PendingBalance = 0m,
+        LastUpdated = DateTime.UtcNow,
+        Created = DateTime.UtcNow,
+        CreatedBy = "System"
+    });
+
+    await identityDbContext.SaveChangesAsync();
+}
+
+public partial class Program { }
